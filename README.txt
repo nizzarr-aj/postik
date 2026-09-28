@@ -52,3 +52,9 @@ The database uses Supabase Auth + PostgreSQL Row Level Security.
 Users can read their own profile/orders/payment requests.
 Admin can review all payment requests and orders.
 Coin addition and order deduction are server-side database functions.
+
+FIXED BUILD
+- Supabase Project URL is already configured for project trfjtzthidqwczfvusze.
+- D17 number is already configured as 25723544.
+- Cache versions are bumped to v10.
+- Upload/replace the five files in the ZIP in the GitHub repository root.
