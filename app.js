@@ -1,4 +1,3 @@
-/* POSTIK V6 - stable app.js */
 (() => {
   "use strict";
 
@@ -11,7 +10,8 @@
   let selectedOffer = null;
   let activePlatform = "all";
   let authMode = "login";
-  let initialized = false;
+
+  const $ = id => document.getElementById(id);
 
   const offers = [
     {
@@ -66,19 +66,14 @@
   ];
 
   const packs = [
-    { coins: 500, price: "5 د.ت" },
-    { coins: 1000, price: "10 د.ت" },
-    { coins: 2500, price: "25 د.ت" },
-    { coins: 5000, price: "50 د.ت" }
+    { coins: 500, price: 5 },
+    { coins: 1000, price: 10 },
+    { coins: 2500, price: 25 },
+    { coins: 5000, price: 50 }
   ];
 
-  const $ = id => document.getElementById(id);
-
-  const moneyCoins = n =>
-    Number(n || 0).toLocaleString();
-
-  function escapeHtml(v) {
-    return String(v ?? "")
+  function escapeHtml(value) {
+    return String(value ?? "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -86,28 +81,33 @@
       .replace(/'/g, "&#039;");
   }
 
-  function showNotice(id, msg, type = "info") {
-    const e = $(id);
-    if (!e) return;
+  function formatCoins(value) {
+    return Number(value || 0).toLocaleString();
+  }
 
-    e.className = `notice ${type}`;
-    e.textContent = msg;
+  function showNotice(id, message, type = "info") {
+    const element = $(id);
+
+    if (!element) return;
+
+    element.className = `notice ${type}`;
+    element.textContent = message;
   }
 
   function hideNotice(id) {
-    const e = $(id);
+    const element = $(id);
 
-    if (e) {
-      e.className = "notice hidden";
-      e.textContent = "";
-    }
+    if (!element) return;
+
+    element.className = "notice hidden";
+    element.textContent = "";
   }
 
   function closeModal(id) {
     $(id)?.classList.add("hidden");
   }
 
-  function scrollToId(id) {
+  function scrollTo(id) {
     $(id)?.scrollIntoView({
       behavior: "smooth",
       block: "start"
@@ -123,35 +123,43 @@
       activePlatform === "all"
         ? offers
         : offers.filter(
-            o => o.platform === activePlatform
+            offer => offer.platform === activePlatform
           );
 
     grid.innerHTML = list
       .map(
-        o => `
-        <article class="offer ${o.featured ? "featured" : ""}">
-          <small>${escapeHtml(o.platform)}</small>
+        offer => `
+          <article class="offer ${offer.featured ? "featured" : ""}">
 
-          <h3>${escapeHtml(o.name)}</h3>
+            <small>
+              ${escapeHtml(offer.platform)}
+            </small>
 
-          <p>${escapeHtml(o.desc)}</p>
+            <h3>
+              ${escapeHtml(offer.name)}
+            </h3>
 
-          <div class="coin-price">
-            ${moneyCoins(o.coins)} Coins
-          </div>
+            <p>
+              ${escapeHtml(offer.desc)}
+            </p>
 
-          <div class="meta">
-            ${escapeHtml(o.label)}
-          </div>
+            <div class="coin-price">
+              ${formatCoins(offer.coins)} Coins
+            </div>
 
-          <button
-            class="btn offer-order-btn"
-            data-id="${escapeHtml(o.id)}"
-            type="button">
-            اختار العرض
-          </button>
-        </article>
-      `
+            <div class="meta">
+              ${escapeHtml(offer.label)}
+            </div>
+
+            <button
+              class="btn offer-order-btn"
+              data-id="${escapeHtml(offer.id)}"
+              type="button">
+              اختار العرض
+            </button>
+
+          </article>
+        `
       )
       .join("");
 
@@ -165,16 +173,16 @@
   }
 
   function renderProfile() {
-    const coins = Number(profile?.coins || 0);
+    const balance = Number(profile?.coins || 0);
 
     if ($("coinBadge")) {
       $("coinBadge").textContent =
-        `${moneyCoins(coins)} Coins`;
+        `${formatCoins(balance)} Coins`;
     }
 
     if ($("dashCoins")) {
       $("dashCoins").textContent =
-        moneyCoins(coins);
+        formatCoins(balance);
     }
 
     if ($("loginBtn")) {
@@ -182,6 +190,11 @@
         session
           ? profile?.username || "حسابي"
           : "دخول";
+    }
+
+    if ($("dashStatus")) {
+      $("dashStatus").textContent =
+        session ? "متصل" : "جاهز";
     }
 
     document
@@ -192,26 +205,9 @@
           profile?.role !== "admin"
         );
       });
-
-    if ($("dashStatus")) {
-      $("dashStatus").textContent =
-        session ? "متصل" : "جاهز";
-    }
   }
 
-  function showAppError(message) {
-    console.error("POSTIK:", message);
-
-    if ($("offerNotice")) {
-      showNotice(
-        "offerNotice",
-        message,
-        "error"
-      );
-    }
-  }
-
-  async function refreshProfile() {
+  async function loadProfile() {
     if (!session) {
       profile = null;
       renderProfile();
@@ -220,10 +216,7 @@
 
     if (!supabase) return;
 
-    const {
-      data,
-      error
-    } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("id,username,coins,role")
       .eq("id", session.user.id)
@@ -234,8 +227,7 @@
 
       showNotice(
         "authNotice",
-        "تعذر تحميل الحساب: " +
-          error.message,
+        "تعذر تحميل الحساب: " + error.message,
         "error"
       );
 
@@ -246,7 +238,7 @@
     renderProfile();
   }
 
-  async function refreshOrders() {
+  async function loadOrders() {
     const list = $("ordersList");
 
     if (!list) return;
@@ -264,10 +256,7 @@
 
     if (!supabase) return;
 
-    const {
-      data,
-      error
-    } = await supabase
+    const { data, error } = await supabase
       .from("orders")
       .select(
         "id,offer_name,platform,coins,url,notes,status,created_at"
@@ -278,72 +267,77 @@
       });
 
     if (error) {
+      console.error(error);
+
       list.innerHTML =
         '<div class="empty">تعذر تحميل الطلبات.</div>';
 
       return;
     }
 
-    const rows = data || [];
+    const orders = data || [];
 
     if ($("dashOrders")) {
       $("dashOrders").textContent =
-        rows.length;
+        orders.length;
     }
 
-    if (!rows.length) {
+    if (!orders.length) {
       list.innerHTML =
         '<div class="empty">ما عندك حتى طلب توّا.</div>';
 
       return;
     }
 
-    list.innerHTML = rows
+    list.innerHTML = orders
       .map(
-        o => `
-        <div class="order-row">
+        order => `
+          <div class="order-row">
 
-          <div>
-            <b>
-              #${escapeHtml(
-                String(o.id).slice(0, 8)
-              )}
-            </b>
+            <div>
 
-            <div class="muted">
-              ${escapeHtml(o.offer_name)}
-              —
-              ${escapeHtml(o.platform)}
+              <b>
+                #${escapeHtml(
+                  String(order.id).slice(0, 8)
+                )}
+              </b>
+
+              <div class="muted">
+                ${escapeHtml(order.offer_name)}
+                —
+                ${escapeHtml(order.platform)}
+              </div>
+
+              <small>
+                ${escapeHtml(order.url)}
+              </small>
+
+              ${
+                order.notes
+                  ? `
+                    <div class="muted">
+                      ${escapeHtml(order.notes)}
+                    </div>
+                  `
+                  : ""
+              }
+
             </div>
 
-            <small>
-              ${escapeHtml(o.url)}
-            </small>
+            <div>
 
-            ${
-              o.notes
-                ? `
-                <div class="muted">
-                  ${escapeHtml(o.notes)}
-                </div>
-              `
-                : ""
-            }
-          </div>
+              <span class="status">
+                ${escapeHtml(order.status)}
+              </span>
 
-          <div>
-            <span class="status">
-              ${escapeHtml(o.status)}
-            </span>
+              <div class="muted">
+                ${formatCoins(order.coins)} Coins
+              </div>
 
-            <div class="muted">
-              ${moneyCoins(o.coins)}
-              Coins
             </div>
-          </div>
 
-        </div>
-      `
+          </div>
+        `
       )
       .join("");
   }
@@ -356,33 +350,19 @@
       return;
     }
 
-    const [paymentsResult, ordersResult] =
-      await Promise.all([
-        supabase
-          .from("payment_requests")
-          .select(
-            "id,user_id,username,pack_coins,amount_tnd,reference,status,created_at"
-          )
-          .order("created_at", {
-            ascending: false
-          }),
+    const paymentResult = await supabase
+      .from("payment_requests")
+      .select(
+        "id,user_id,username,pack_coins,amount_tnd,reference,status,created_at"
+      )
+      .order("created_at", {
+        ascending: false
+      });
 
-        supabase
-          .from("orders")
-          .select(
-            "id,user_id,username,offer_name,platform,coins,url,status,created_at"
-          )
-          .order("created_at", {
-            ascending: false
-          })
-          .limit(50)
-      ]);
-
-    if (paymentsResult.error) {
+    if (paymentResult.error) {
       showNotice(
         "adminNotice",
-        "تعذر تحميل طلبات الدفع: " +
-          paymentsResult.error.message,
+        paymentResult.error.message,
         "error"
       );
 
@@ -390,209 +370,88 @@
     }
 
     const payments =
-      paymentsResult.data || [];
+      paymentResult.data || [];
 
     if ($("adminPayments")) {
       $("adminPayments").innerHTML =
         payments.length
           ? payments
               .map(
-                x => `
-                <div class="order-row">
+                payment => `
+                  <div class="order-row">
 
-                  <div>
-                    <b>
-                      💳
-                      ${escapeHtml(
-                        String(x.id).slice(0, 8)
-                      )}
-                    </b>
+                    <div>
 
-                    <div class="muted">
-                      ${escapeHtml(
-                        x.username || ""
-                      )}
-                      —
-                      ${moneyCoins(
-                        x.pack_coins
-                      )}
-                      Coins /
-                      ${escapeHtml(
-                        x.amount_tnd
-                      )}
-                      د.ت
+                      <b>
+                        💳
+                        ${escapeHtml(
+                          String(payment.id).slice(0, 8)
+                        )}
+                      </b>
+
+                      <div class="muted">
+                        ${escapeHtml(
+                          payment.username || ""
+                        )}
+                        —
+                        ${formatCoins(
+                          payment.pack_coins
+                        )}
+                        Coins /
+                        ${escapeHtml(
+                          payment.amount_tnd
+                        )}
+                        د.ت
+                      </div>
+
+                      <div class="muted">
+                        مرجع:
+                        ${escapeHtml(
+                          payment.reference
+                        )}
+                      </div>
+
                     </div>
 
-                    <div class="muted">
-                      مرجع:
-                      ${escapeHtml(
-                        x.reference
-                      )}
+                    <div>
+
+                      <span class="status">
+                        ${escapeHtml(
+                          payment.status
+                        )}
+                      </span>
+
+                      ${
+                        payment.status ===
+                        "pending"
+                          ? `
+                            <button
+                              class="btn small approve-payment"
+                              data-id="${escapeHtml(
+                                payment.id
+                              )}"
+                              type="button">
+                              تأكيد الدفع
+                            </button>
+
+                            <button
+                              class="btn small reject-payment"
+                              data-id="${escapeHtml(
+                                payment.id
+                              )}"
+                              type="button">
+                              رفض
+                            </button>
+                          `
+                          : ""
+                      }
+
                     </div>
+
                   </div>
-
-                  <div>
-                    <span class="status">
-                      ${escapeHtml(x.status)}
-                    </span>
-
-                    ${
-                      x.status === "pending"
-                        ? `
-                          <button
-                            class="btn small approve-payment"
-                            data-id="${escapeHtml(
-                              x.id
-                            )}"
-                            type="button">
-                            تأكيد الدفع
-                          </button>
-
-                          <button
-                            class="btn small reject-payment"
-                            data-id="${escapeHtml(
-                              x.id
-                            )}"
-                            type="button">
-                            رفض
-                          </button>
-                        `
-                        : ""
-                    }
-                  </div>
-
-                </div>
-              `
+                `
               )
               .join("")
           : '<div class="empty">ما فماش طلبات دفع.</div>';
 
-      $("adminPayments")
-        .querySelectorAll(".approve-payment")
-        .forEach(button => {
-          button.addEventListener(
-            "click",
-            () =>
-              approvePayment(
-                button.dataset.id
-              )
-          );
-        });
-
-      $("adminPayments")
-        .querySelectorAll(".reject-payment")
-        .forEach(button => {
-          button.addEventListener(
-            "click",
-            () =>
-              rejectPayment(
-                button.dataset.id
-              )
-          );
-        });
-    }
-
-    if (ordersResult.error) {
-      if ($("adminOrders")) {
-        $("adminOrders").innerHTML =
-          '<div class="empty">تعذر تحميل الطلبات.</div>';
-      }
-
-      return;
-    }
-
-    const orders =
-      ordersResult.data || [];
-
-    if ($("adminOrders")) {
-      $("adminOrders").innerHTML =
-        orders.length
-          ? orders
-              .map(
-                x => `
-                <div class="order-row">
-
-                  <div>
-                    <b>
-                      #${escapeHtml(
-                        String(x.id).slice(0, 8)
-                      )}
-                    </b>
-
-                    <div class="muted">
-                      ${escapeHtml(
-                        x.username || ""
-                      )}
-                      —
-                      ${escapeHtml(
-                        x.offer_name
-                      )}
-                    </div>
-                  </div>
-
-                  <span class="status">
-                    ${escapeHtml(x.status)}
-                  </span>
-
-                </div>
-              `
-              )
-              .join("")
-          : '<div class="empty">ما فماش طلبات.</div>';
-    }
-  }
-
-  async function approvePayment(id) {
-    if (!supabase) return;
-
-    if (
-      !confirm(
-        "تأكيد أنك تحققت من تحويل D17؟"
-      )
-    ) {
-      return;
-    }
-
-    const { error } =
-      await supabase.rpc(
-        "approve_payment",
-        {
-          p_payment_id: id
-        }
-      );
-
-    if (error) {
-      showNotice(
-        "adminNotice",
-        error.message,
-        "error"
-      );
-
-      return;
-    }
-
-    showNotice(
-      "adminNotice",
-      "✅ تم تأكيد الدفع وإضافة الـCoins للحساب.",
-      "ok"
-    );
-
-    await refreshAdmin();
-  }
-
-  async function rejectPayment(id) {
-    if (!supabase) return;
-
-    if (
-      !confirm(
-        "هل تريد رفض طلب الدفع؟"
-      )
-    ) {
-      return;
-    }
-
-    const { error } =
-      await supabase.rpc(
-        "reject_payment",
-        {
-          p_payment_id
+      document
