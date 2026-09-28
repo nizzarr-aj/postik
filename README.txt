@@ -1,0 +1,1 @@
+POSTIK — front-end prototype. Payment, Coins, authentication, order database and official ad integrations are backend steps.
