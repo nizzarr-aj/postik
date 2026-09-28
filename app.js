@@ -1,4 +1,4 @@
-const KEY = "postik_local_v4";
+const KEY = "postik_local_v5";
 const D17_NUMBER = "25723544";
 
 const DEFAULT_STATE = {
@@ -80,6 +80,7 @@ function loadState() {
     // Keep existing V3 data when upgrading.
     const raw =
       localStorage.getItem(KEY) ||
+      localStorage.getItem("postik_local_v4") ||
       localStorage.getItem("postik_local_v3");
 
     if (!raw) {
@@ -605,7 +606,10 @@ function confirmOrder() {
     return;
   }
 
-  if (state.coins < selectedOffer.coins) {
+  const cost = Number(selectedOffer.coins) || 0;
+  const currentCoins = Number(state.coins) || 0;
+
+  if (currentCoins < cost) {
     showNotice(
       "orderNotice",
       "الرصيد ما يكفيش. اشحن Coins أولاً.",
@@ -614,7 +618,8 @@ function confirmOrder() {
     return;
   }
 
-  state.coins -= selectedOffer.coins;
+  // Deduct the exact order cost before saving the order.
+  state.coins = currentCoins - cost;
 
   const id =
     "PK-" +
@@ -630,7 +635,7 @@ function confirmOrder() {
     id,
     offer: selectedOffer.name,
     platform: selectedOffer.platform,
-    coins: selectedOffer.coins,
+    coins: cost,
     url,
     notes,
     status: "قيد المعالجة",
@@ -821,6 +826,24 @@ document.addEventListener(
     render();
   }
 );
+
+// Keep open tabs synchronized when Coins/orders change.
+window.addEventListener("storage", event => {
+  if (event.key !== KEY || !event.newValue) return;
+
+  try {
+    const parsed = JSON.parse(event.newValue);
+    state = {
+      coins: Number(parsed.coins) || 0,
+      user: parsed.user || null,
+      orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+      d17Requests: Array.isArray(parsed.d17Requests) ? parsed.d17Requests : []
+    };
+    render();
+  } catch (error) {
+    console.error("POSTIK sync error:", error);
+  }
+});
 
 window.POSTIK = {
   openWallet,
