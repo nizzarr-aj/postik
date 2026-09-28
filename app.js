@@ -1,1081 +1,332 @@
+/* POSTIK V6 - stable app.js */
 (() => {
   "use strict";
 
   const CONFIG = window.POSTIK_CONFIG || {};
   const D17_NUMBER = CONFIG.D17_NUMBER || "25723544";
-
   let supabase = null;
-  let currentUser = null;
+  let session = null;
   let profile = null;
   let selectedOffer = null;
-  let selectedPack = null;
+  let activePlatform = "all";
+  let authMode = "login";
+  let initialized = false;
 
-  const $ = (id) => document.getElementById(id);
-
-  const OFFERS = [
-    {
-      id: "tt-promo-1",
-      platform: "TikTok",
-      name: "TikTok Promotion Starter",
-      desc: "حملة ترويج للمحتوى.",
-      coins: 500
-    },
-    {
-      id: "tt-promo-2",
-      platform: "TikTok",
-      name: "TikTok Promotion Growth",
-      desc: "حملة ترويج أكبر.",
-      coins: 1200
-    },
-    {
-      id: "ig-promo-1",
-      platform: "Instagram",
-      name: "Instagram Promotion",
-      desc: "ترويج لمحتوى Instagram.",
-      coins: 700
-    },
-    {
-      id: "yt-promo-1",
-      platform: "YouTube",
-      name: "YouTube Promotion",
-      desc: "ترويج للفيديو.",
-      coins: 1000
-    },
-    {
-      id: "tt-profile-1",
-      platform: "TikTok",
-      name: "TikTok Profile Promotion",
-      desc: "ترويج للملف الشخصي.",
-      coins: 900
-    },
-    {
-      id: "ig-content-1",
-      platform: "Instagram",
-      name: "Instagram Content Promotion",
-      desc: "ترويج للمحتوى.",
-      coins: 900
-    }
+  const offers = [
+    {id:"tt-promo-1",platform:"TikTok",name:"TikTok Promotion Starter",desc:"حملة ترويج للمحتوى عبر القنوات الرسمية المتاحة.",coins:500,label:"حزمة بداية"},
+    {id:"tt-promo-2",platform:"TikTok",name:"TikTok Promotion Growth",desc:"حملة ترويج أكبر بميزانية ونطاق أعلى.",coins:1200,label:"حزمة نمو",featured:true},
+    {id:"ig-promo-1",platform:"Instagram",name:"Instagram Promotion",desc:"ترويج رسمي لمنشور أو محتوى حسب الأدوات المتاحة.",coins:700,label:"حزمة أساسية"},
+    {id:"yt-promo-1",platform:"YouTube",name:"YouTube Promotion",desc:"حملة ترويج للفيديو عبر الإعلانات الرسمية.",coins:1000,label:"حزمة فيديو"},
+    {id:"tt-profile-1",platform:"TikTok",name:"TikTok Profile Promotion",desc:"حملة ترويج للملف الشخصي عبر القنوات الرسمية المتاحة.",coins:900,label:"حزمة بروفايل"},
+    {id:"ig-content-1",platform:"Instagram",name:"Instagram Content Promotion",desc:"حملة ترويج للمحتوى مع متابعة حالة الطلب.",coins:900,label:"حزمة محتوى"}
   ];
 
-  const PACKS = [
-    { coins: 500, price: 5 },
-    { coins: 1000, price: 10 },
-    { coins: 2500, price: 25 },
-    { coins: 5000, price: 50 }
+  const packs = [
+    {coins:500,price:"5 د.ت"},
+    {coins:1000,price:"10 د.ت"},
+    {coins:2500,price:"25 د.ت"},
+    {coins:5000,price:"50 د.ت"}
   ];
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  const $ = id => document.getElementById(id);
+  const moneyCoins = n => Number(n || 0).toLocaleString();
+
+  function escapeHtml(v){
+    return String(v ?? "")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
   }
 
-  function show(id) {
-    const el = $(id);
-    if (el) el.classList.remove("hidden");
+  function showNotice(id,msg,type="info"){
+    const e=$(id);
+    if(!e) return;
+    e.className=`notice ${type}`;
+    e.textContent=msg;
   }
 
-  function hide(id) {
-    const el = $(id);
-    if (el) el.classList.add("hidden");
+  function hideNotice(id){
+    const e=$(id);
+    if(e){ e.className="notice hidden"; e.textContent=""; }
   }
 
-  function notice(id, message, success = false) {
-    const el = $(id);
-    if (!el) return;
+  function closeModal(id){ $(id)?.classList.add("hidden"); }
+  function scrollToId(id){ $(id)?.scrollIntoView({behavior:"smooth",block:"start"}); }
 
-    el.textContent = message;
-    el.className = "notice " + (success ? "success" : "error");
+  function renderOffers(){
+    const grid=$("offerGrid");
+    if(!grid) return;
+    const list=activePlatform==="all" ? offers : offers.filter(o=>o.platform===activePlatform);
+    grid.innerHTML=list.map(o=>`
+      <article class="offer ${o.featured?"featured":""}">
+        <small>${escapeHtml(o.platform)}</small>
+        <h3>${escapeHtml(o.name)}</h3>
+        <p>${escapeHtml(o.desc)}</p>
+        <div class="coin-price">${moneyCoins(o.coins)} Coins</div>
+        <div class="meta">${escapeHtml(o.label)}</div>
+        <button class="btn offer-order-btn" data-id="${escapeHtml(o.id)}" type="button">اختار العرض</button>
+      </article>`).join("");
+    grid.querySelectorAll(".offer-order-btn").forEach(b=>b.addEventListener("click",()=>openOrder(b.dataset.id)));
   }
 
-  function clearNotice(id) {
-    const el = $(id);
-    if (!el) return;
-
-    el.textContent = "";
-    el.className = "notice hidden";
+  function renderProfile(){
+    const coins=Number(profile?.coins||0);
+    if($("coinBadge")) $("coinBadge").textContent=`${moneyCoins(coins)} Coins`;
+    if($("dashCoins")) $("dashCoins").textContent=moneyCoins(coins);
+    if($("loginBtn")) $("loginBtn").textContent=session ? (profile?.username || "حسابي") : "دخول";
+    document.querySelectorAll(".admin-only").forEach(e=>e.classList.toggle("hidden",profile?.role!=="admin"));
+    if($("dashStatus")) $("dashStatus").textContent=session ? "متصل" : "جاهز";
   }
 
-  function renderOffers(platform = "all") {
-    const grid = $("offerGrid");
-    if (!grid) return;
-
-    const list =
-      platform === "all"
-        ? OFFERS
-        : OFFERS.filter((offer) => offer.platform === platform);
-
-    grid.innerHTML = list
-      .map(
-        (offer) => `
-          <article class="offer-card">
-            <small>${escapeHtml(offer.platform)}</small>
-
-            <h3>${escapeHtml(offer.name)}</h3>
-
-            <p>${escapeHtml(offer.desc)}</p>
-
-            <strong>${offer.coins} Coins</strong>
-
-            <br><br>
-
-            <button
-              class="btn offer-btn"
-              data-id="${escapeHtml(offer.id)}"
-              type="button">
-              اختار العرض
-            </button>
-          </article>
-        `
-      )
-      .join("");
-
-    grid.querySelectorAll(".offer-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        openOrder(button.dataset.id);
-      });
-    });
+  function showAppError(message){
+    console.error("POSTIK:",message);
+    const box=$("offerNotice");
+    if(box) showNotice("offerNotice",message,"error");
   }
 
-  function renderPacks() {
-    const grid = $("coinPacks");
-    if (!grid) return;
-
-    grid.innerHTML = PACKS
-      .map(
-        (pack, index) => `
-          <button
-            class="pack"
-            data-index="${index}"
-            type="button">
-
-            <b>${pack.coins} Coins</b>
-
-            <span>${pack.price} د.ت</span>
-
-          </button>
-        `
-      )
-      .join("");
-
-    grid.querySelectorAll(".pack").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.index);
-        openD17(PACKS[index]);
-      });
-    });
+  async function refreshProfile(){
+    if(!session){ profile=null; renderProfile(); return; }
+    if(!supabase) return;
+    const {data,error}=await supabase.from("profiles").select("id,username,coins,role").eq("id",session.user.id).maybeSingle();
+    if(error){ console.error(error); showNotice("authNotice","تعذر تحميل الحساب: "+error.message,"error"); return; }
+    profile=data;
+    renderProfile();
   }
 
-  function updateUI() {
-    const coins = Number(profile?.coins || 0);
-
-    if ($("coinBadge")) {
-      $("coinBadge").textContent = `${coins} Coins`;
+  async function refreshOrders(){
+    const list=$("ordersList");
+    if(!list) return;
+    if(!session){
+      list.innerHTML='<div class="empty">سجّل الدخول باش تشوف طلباتك.</div>';
+      if($("dashOrders")) $("dashOrders").textContent="0";
+      return;
     }
-
-    if ($("dashCoins")) {
-      $("dashCoins").textContent = coins;
-    }
-
-    if ($("dashStatus")) {
-      $("dashStatus").textContent = currentUser
-        ? "متصل"
-        : "جاهز";
-    }
-
-    if ($("loginBtn")) {
-      $("loginBtn").textContent = currentUser
-        ? profile?.username || "حسابي"
-        : "دخول";
-    }
-
-    document
-      .querySelectorAll(".admin-only")
-      .forEach((element) => {
-        element.classList.toggle(
-          "hidden",
-          profile?.role !== "admin"
-        );
-      });
+    if(!supabase) return;
+    const {data,error}=await supabase.from("orders").select("id,offer_name,platform,coins,url,notes,status,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false});
+    if(error){ list.innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; return; }
+    const rows=data||[];
+    if($("dashOrders")) $("dashOrders").textContent=rows.length;
+    if(!rows.length){ list.innerHTML='<div class="empty">ما عندك حتى طلب توّا.</div>'; return; }
+    list.innerHTML=rows.map(o=>`
+      <div class="order-row">
+        <div><b>#${escapeHtml(String(o.id).slice(0,8))}</b><div class="muted">${escapeHtml(o.offer_name)} — ${escapeHtml(o.platform)}</div><small>${escapeHtml(o.url)}</small>${o.notes?`<div class="muted">${escapeHtml(o.notes)}</div>`:""}</div>
+        <div><span class="status">${escapeHtml(o.status)}</span><div class="muted">${moneyCoins(o.coins)} Coins</div></div>
+      </div>`).join("");
   }
 
-  async function loadProfile() {
-    if (!currentUser) {
-      profile = null;
-      updateUI();
-      await loadOrders();
-      return;
+  async function refreshAdmin(){
+    if(profile?.role!=="admin" || !supabase) return;
+    const [p,o]=await Promise.all([
+      supabase.from("payment_requests").select("id,user_id,username,pack_coins,amount_tnd,reference,status,created_at").order("created_at",{ascending:false}),
+      supabase.from("orders").select("id,user_id,username,offer_name,platform,coins,url,status,created_at").order("created_at",{ascending:false}).limit(50)
+    ]);
+    if(p.error){ showNotice("adminNotice","تعذر تحميل طلبات الدفع: "+p.error.message,"error"); return; }
+    const payments=p.data||[];
+    if($("adminPayments")){
+      $("adminPayments").innerHTML=payments.length?payments.map(x=>`
+        <div class="order-row">
+          <div><b>💳 ${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${moneyCoins(x.pack_coins)} Coins / ${escapeHtml(x.amount_tnd)} د.ت</div><div class="muted">مرجع: ${escapeHtml(x.reference)}</div></div>
+          <div><span class="status">${escapeHtml(x.status)}</span>${x.status==="pending"?`<button class="btn small approve-payment" data-id="${escapeHtml(x.id)}" type="button">تأكيد الدفع</button> <button class="btn small reject-payment" data-id="${escapeHtml(x.id)}" type="button">رفض</button>`:""}</div>
+        </div>`).join(""):'<div class="empty">ما فماش طلبات دفع.</div>';
+      $("adminPayments").querySelectorAll(".approve-payment").forEach(b=>b.addEventListener("click",()=>approvePayment(b.dataset.id)));
+      $("adminPayments").querySelectorAll(".reject-payment").forEach(b=>b.addEventListener("click",()=>rejectPayment(b.dataset.id)));
     }
-
-    if (!supabase) return;
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", currentUser.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Profile error:", error);
-      return;
-    }
-
-    profile = data;
-
-    updateUI();
-
-    await loadOrders();
-
-    if (profile?.role === "admin") {
-      await loadAdmin();
-    }
+    if(o.error){ if($("adminOrders")) $("adminOrders").innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; return; }
+    const orders=o.data||[];
+    if($("adminOrders")) $("adminOrders").innerHTML=orders.length?orders.map(x=>`
+      <div class="order-row"><div><b>#${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${escapeHtml(x.offer_name)}</div></div><span class="status">${escapeHtml(x.status)}</span></div>`).join(""):'<div class="empty">ما فماش طلبات.</div>';
   }
 
-  async function loadOrders() {
-    const list = $("ordersList");
-
-    if (!list) return;
-
-    if (!currentUser) {
-      list.innerHTML =
-        `<div class="empty">سجّل الدخول باش تشوف طلباتك.</div>`;
-
-      if ($("dashOrders")) {
-        $("dashOrders").textContent = "0";
-      }
-
-      return;
-    }
-
-    if (!supabase) return;
-
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .order("created_at", {
-        ascending: false
-      });
-
-    if (error) {
-      console.error("Orders error:", error);
-
-      list.innerHTML =
-        `<div class="empty">تعذر تحميل الطلبات.</div>`;
-
-      return;
-    }
-
-    const orders = data || [];
-
-    if ($("dashOrders")) {
-      $("dashOrders").textContent = orders.length;
-    }
-
-    if (!orders.length) {
-      list.innerHTML =
-        `<div class="empty">ما عندك حتى طلب توّا.</div>`;
-
-      return;
-    }
-
-    list.innerHTML = orders
-      .map(
-        (order) => `
-          <div class="order-row">
-
-            <div>
-              <b>${escapeHtml(order.offer_name)}</b>
-
-              <div class="muted">
-                ${escapeHtml(order.platform)}
-                ·
-                ${order.coins} Coins
-              </div>
-
-              <small>
-                ${escapeHtml(order.url || "")}
-              </small>
-            </div>
-
-            <div>
-              <span class="status">
-                ${escapeHtml(order.status || "pending")}
-              </span>
-            </div>
-
-          </div>
-        `
-      )
-      .join("");
+  async function approvePayment(id){
+    if(!supabase || !confirm("تأكيد أنك تحققت من تحويل D17؟")) return;
+    const {error}=await supabase.rpc("approve_payment",{p_payment_id:id});
+    if(error){showNotice("adminNotice",error.message,"error");return;}
+    showNotice("adminNotice","✅ تم تأكيد الدفع وإضافة الـCoins للحساب.","ok");
+    await refreshAdmin();
   }
 
-  function openAuth(mode = "login") {
-    const modal = $("auth");
-    if (!modal) return;
-
-    modal.dataset.mode = mode;
-
-    show("auth");
-
-    if ($("authUsernameWrap")) {
-      $("authUsernameWrap").classList.toggle(
-        "hidden",
-        mode !== "signup"
-      );
-    }
-
-    if ($("authSubmitBtn")) {
-      $("authSubmitBtn").textContent =
-        mode === "signup"
-          ? "إنشاء الحساب"
-          : "دخول";
-    }
-
-    if ($("showLoginTab")) {
-      $("showLoginTab").classList.toggle(
-        "active",
-        mode === "login"
-      );
-    }
-
-    if ($("showSignupTab")) {
-      $("showSignupTab").classList.toggle(
-        "active",
-        mode === "signup"
-      );
-    }
-
-    clearNotice("authNotice");
+  async function rejectPayment(id){
+    if(!supabase || !confirm("هل تريد رفض طلب الدفع؟")) return;
+    const {error}=await supabase.rpc("reject_payment",{p_payment_id:id});
+    if(error){showNotice("adminNotice",error.message,"error");return;}
+    showNotice("adminNotice","تم رفض طلب الدفع.","ok");
+    await refreshAdmin();
   }
 
-  function openWallet() {
-    if (!currentUser) {
-      openAuth("login");
-      return;
-    }
-
-    show("wallet");
+  function openAuth(){
+    const modal=$("auth"); if(!modal) return;
+    modal.classList.remove("hidden");
+    if($("authEmail")) $("authEmail").value="";
+    if($("authPassword")) $("authPassword").value="";
+    if($("authUsername")) $("authUsername").value=profile?.username||"";
+    setAuthMode(session?"login":authMode);
+    hideNotice("authNotice");
   }
 
-  function openD17(pack) {
-    if (!currentUser) {
-      openAuth("login");
-      return;
-    }
-
-    selectedPack = pack;
-
-    if ($("d17Number")) {
-      $("d17Number").textContent = D17_NUMBER;
-    }
-
-    if ($("d17Pack")) {
-      $("d17Pack").textContent =
-        `${pack.coins} Coins — ${pack.price} د.ت`;
-    }
-
-    if ($("d17Reference")) {
-      $("d17Reference").value = "";
-    }
-
-    clearNotice("d17Notice");
-
-    show("d17Modal");
+  function setAuthMode(mode){
+    authMode=mode;
+    $("showLoginTab")?.classList.toggle("active",mode==="login");
+    $("showSignupTab")?.classList.toggle("active",mode==="signup");
+    $("authUsernameWrap")?.classList.toggle("hidden",mode!=="signup");
+    $("authSubmitBtn")?.classList.toggle("hidden",!!session);
+    $("logoutBtn")?.classList.toggle("hidden",!session);
+    if($("authSubmitBtn")) $("authSubmitBtn").textContent=mode==="signup"?"إنشاء الحساب":"دخول";
   }
 
-  function openOrder(id) {
-    if (!currentUser) {
-      openAuth("login");
+  async function authSubmit(){
+    if(!supabase) return showNotice("authNotice","الاتصال بـSupabase مازال ما تجهزش. عاود افتح الصفحة.","error");
+    const email=$("authEmail")?.value.trim();
+    const password=$("authPassword")?.value||"";
+    if(!email||!password) return showNotice("authNotice","اكتب البريد وكلمة السر.","warn");
+    if(authMode==="signup"){
+      const username=$("authUsername")?.value.trim();
+      if(!username) return showNotice("authNotice","اكتب اسم المستخدم.","warn");
+      const {data,error}=await supabase.auth.signUp({email,password,options:{data:{username}}});
+      if(error) return showNotice("authNotice",error.message,"error");
+      showNotice("authNotice",data.session?"✅ الحساب تخلق وتعمل دخول.":"✅ الحساب تخلق. إذا طلب التأكيد، أكّد البريد ثم ادخل.","ok");
+      if(data.session){session=data.session;await refreshProfile();await refreshOrders();closeModal("auth");}
       return;
     }
-
-    selectedOffer = OFFERS.find(
-      (offer) => offer.id === id
-    );
-
-    if (!selectedOffer) return;
-
-    if ($("orderTitle")) {
-      $("orderTitle").textContent =
-        selectedOffer.name;
-    }
-
-    if ($("orderDesc")) {
-      $("orderDesc").textContent =
-        selectedOffer.desc;
-    }
-
-    if ($("orderCoins")) {
-      $("orderCoins").textContent =
-        `${selectedOffer.coins} Coins`;
-    }
-
-    if ($("contentUrl")) {
-      $("contentUrl").value = "";
-    }
-
-    if ($("notes")) {
-      $("notes").value = "";
-    }
-
-    clearNotice("orderNotice");
-
-    show("orderModal");
+    const {data,error}=await supabase.auth.signInWithPassword({email,password});
+    if(error) return showNotice("authNotice",error.message,"error");
+    session=data.session; await refreshProfile(); await refreshOrders(); closeModal("auth");
   }
 
-  async function submitAuth() {
-    if (!supabase) {
-      notice(
-        "authNotice",
-        "الاتصال بـ Supabase ما خدمش."
-      );
-      return;
-    }
-
-    const email =
-      $("authEmail")?.value.trim();
-
-    const password =
-      $("authPassword")?.value;
-
-    const mode =
-      $("auth")?.dataset.mode || "login";
-
-    if (!email || !password) {
-      notice(
-        "authNotice",
-        "اكتب البريد الإلكتروني وكلمة السر."
-      );
-      return;
-    }
-
-    if (password.length < 6) {
-      notice(
-        "authNotice",
-        "كلمة السر لازم تكون 6 أحرف على الأقل."
-      );
-      return;
-    }
-
-    let result;
-
-    if (mode === "signup") {
-      const username =
-        $("authUsername")?.value.trim() ||
-        email.split("@")[0];
-
-      result = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username
-          }
-        }
-      });
-    } else {
-      result =
-        await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-    }
-
-    if (result.error) {
-      notice(
-        "authNotice",
-        result.error.message
-      );
-      return;
-    }
-
-    if (
-      mode === "signup" &&
-      !result.data.session
-    ) {
-      notice(
-        "authNotice",
-        "تم إنشاء الحساب. أكّد البريد الإلكتروني إذا طلب منك ذلك.",
-        true
-      );
-      return;
-    }
-
-    hide("auth");
+  async function logout(){
+    if(supabase) await supabase.auth.signOut();
+    session=null; profile=null; renderProfile(); await refreshOrders(); closeModal("auth");
   }
 
-  async function submitD17() {
-    if (!currentUser || !selectedPack) {
-      return;
-    }
-
-    const reference =
-      $("d17Reference")?.value.trim();
-
-    if (!reference) {
-      notice(
-        "d17Notice",
-        "اكتب مرجع عملية D17."
-      );
-      return;
-    }
-
-    const { error } =
-      await supabase
-        .from("payment_requests")
-        .insert({
-          user_id: currentUser.id,
-          username:
-            profile?.username ||
-            currentUser.email,
-
-          pack_coins:
-            selectedPack.coins,
-
-          amount_tnd:
-            selectedPack.price,
-
-          reference,
-
-          status: "pending"
-        });
-
-    if (error) {
-      notice(
-        "d17Notice",
-        error.message
-      );
-      return;
-    }
-
-    notice(
-      "d17Notice",
-      "تم إرسال الطلب بنجاح. تتم إضافة Coins بعد التحقق من الدفع.",
-      true
-    );
-
-    setTimeout(() => {
-      hide("d17Modal");
-    }, 1500);
+  function openWallet(){
+    const packBox=$("coinPacks"); if(!packBox) return;
+    packBox.innerHTML=packs.map(p=>`<div class="coin-pack"><b>${moneyCoins(p.coins)} Coins</b><span>${p.price}</span><button class="btn small topup-btn" data-coins="${p.coins}" type="button">اختار</button></div>`).join("");
+    $("wallet")?.classList.remove("hidden");
+    packBox.querySelectorAll(".topup-btn").forEach(b=>b.addEventListener("click",()=>openD17Payment(Number(b.dataset.coins))));
   }
 
-  async function submitOrder() {
-    if (!currentUser || !selectedOffer) {
-      return;
-    }
-
-    const url =
-      $("contentUrl")?.value.trim();
-
-    const notes =
-      $("notes")?.value.trim() || "";
-
-    if (
-      !url ||
-      !/^https?:\/\//i.test(url)
-    ) {
-      notice(
-        "orderNotice",
-        "أدخل رابط صحيح يبدأ بـ https:// أو http://"
-      );
-      return;
-    }
-
-    const { error } =
-      await supabase.rpc(
-        "place_order",
-        {
-          p_offer_id:
-            selectedOffer.id,
-
-          p_offer_name:
-            selectedOffer.name,
-
-          p_platform:
-            selectedOffer.platform,
-
-          p_coins:
-            selectedOffer.coins,
-
-          p_url:
-            url,
-
-          p_notes:
-            notes
-        }
-      );
-
-    if (error) {
-      notice(
-        "orderNotice",
-        error.message
-      );
-      return;
-    }
-
-    notice(
-      "orderNotice",
-      "تم تسجيل الطلب وخصم Coins بنجاح.",
-      true
-    );
-
-    await loadProfile();
-
-    setTimeout(() => {
-      hide("orderModal");
-    }, 1200);
+  function openD17Payment(coins){
+    if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}
+    const pack=packs.find(p=>p.coins===coins); if(!pack) return;
+    if($("d17Number")) $("d17Number").textContent=D17_NUMBER;
+    if($("d17Pack")) $("d17Pack").textContent=`${moneyCoins(pack.coins)} Coins — ${pack.price}`;
+    if($("d17Reference")) $("d17Reference").value="";
+    hideNotice("d17Notice"); closeModal("wallet"); $("d17Modal")?.classList.remove("hidden");
   }
 
-  async function loadAdmin() {
-    if (
-      !supabase ||
-      profile?.role !== "admin"
-    ) {
-      return;
-    }
-
-    const payments =
-      await supabase
-        .from("payment_requests")
-        .select("*")
-        .order("created_at", {
-          ascending: false
-        });
-
-    if (payments.error) {
-      console.error(
-        "Admin payments:",
-        payments.error
-      );
-      return;
-    }
-
-    const paymentList =
-      payments.data || [];
-
-    if ($("adminPayments")) {
-      if (!paymentList.length) {
-        $("adminPayments").innerHTML =
-          `<div class="empty">لا توجد طلبات دفع.</div>`;
-      } else {
-        $("adminPayments").innerHTML =
-          paymentList
-            .map(
-              (payment) => `
-                <div class="order-row">
-
-                  <div>
-                    <b>
-                      ${escapeHtml(
-                        payment.username || ""
-                      )}
-                    </b>
-
-                    <div class="muted">
-                      ${payment.pack_coins}
-                      Coins —
-                      ${payment.amount_tnd}
-                      د.ت
-                    </div>
-
-                    <div class="muted">
-                      مرجع:
-                      ${escapeHtml(
-                        payment.reference || ""
-                      )}
-                    </div>
-
-                    <small>
-                      الحالة:
-                      ${escapeHtml(
-                        payment.status
-                      )}
-                    </small>
-                  </div>
-
-                  <div>
-                    ${
-                      payment.status ===
-                      "pending"
-                        ? `
-                          <button
-                            class="btn small approve-btn"
-                            data-id="${payment.id}"
-                            type="button">
-                            قبول
-                          </button>
-
-                          <button
-                            class="btn small reject-btn"
-                            data-id="${payment.id}"
-                            type="button">
-                            رفض
-                          </button>
-                        `
-                        : ""
-                    }
-                  </div>
-
-                </div>
-              `
-            )
-            .join("");
-
-        $("adminPayments")
-          .querySelectorAll(".approve-btn")
-          .forEach((button) => {
-            button.addEventListener(
-              "click",
-              async () => {
-                const { error } =
-                  await supabase.rpc(
-                    "approve_payment",
-                    {
-                      payment_id:
-                        button.dataset.id
-                    }
-                  );
-
-                if (error) {
-                  alert(error.message);
-                  return;
-                }
-
-                alert(
-                  "تم قبول الدفع وإضافة Coins."
-                );
-
-                await loadAdmin();
-              }
-            );
-          });
-
-        $("adminPayments")
-          .querySelectorAll(".reject-btn")
-          .forEach((button) => {
-            button.addEventListener(
-              "click",
-              async () => {
-                const { error } =
-                  await supabase.rpc(
-                    "reject_payment",
-                    {
-                      payment_id:
-                        button.dataset.id
-                    }
-                  );
-
-                if (error) {
-                  alert(error.message);
-                  return;
-                }
-
-                await loadAdmin();
-              }
-            );
-          });
-      }
-    }
-
-    const orders =
-      await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", {
-          ascending: false
-        });
-
-    if ($("adminOrders")) {
-      const list = orders.data || [];
-
-      $("adminOrders").innerHTML =
-        list.length
-          ? list
-              .map(
-                (order) => `
-                  <div class="order-row">
-                    <b>
-                      ${escapeHtml(
-                        order.offer_name
-                      )}
-                    </b>
-
-                    <div>
-                      ${escapeHtml(
-                        order.username || ""
-                      )}
-                      —
-                      ${order.coins}
-                      Coins
-                    </div>
-                  </div>
-                `
-              )
-              .join("")
-          : `<div class="empty">لا توجد طلبات.</div>`;
-    }
+  async function copyD17(){
+    try{await navigator.clipboard.writeText(D17_NUMBER);showNotice("d17Notice","✅ تم نسخ رقم D17.","ok");}
+    catch(e){showNotice("d17Notice",`رقم D17: ${D17_NUMBER}`,"info");}
   }
 
-  function bindEvents() {
-
-    $("getStartedBtn")
-      ?.addEventListener("click", () => {
-        openAuth("signup");
-      });
-
-    $("loginBtn")
-      ?.addEventListener("click", () => {
-        if (currentUser) {
-          openWallet();
-        } else {
-          openAuth("login");
-        }
-      });
-
-    $("buyCoinsBtn")
-      ?.addEventListener("click", openWallet);
-
-    $("walletNavBtn")
-      ?.addEventListener("click", openWallet);
-
-    $("ordersNavBtn")
-      ?.addEventListener("click", () => {
-        $("orders")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("adminNavBtn")
-      ?.addEventListener("click", () => {
-        $("adminPanel")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("tiktokServiceBtn")
-      ?.addEventListener("click", () => {
-        renderOffers("TikTok");
-
-        $("offers")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("instagramServiceBtn")
-      ?.addEventListener("click", () => {
-        renderOffers("Instagram");
-
-        $("offers")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("youtubeServiceBtn")
-      ?.addEventListener("click", () => {
-        renderOffers("YouTube");
-
-        $("offers")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("exploreServicesBtn")
-      ?.addEventListener("click", () => {
-        $("services")?.scrollIntoView({
-          behavior: "smooth"
-        });
-      });
-
-    $("showLoginTab")
-      ?.addEventListener("click", () => {
-        openAuth("login");
-      });
-
-    $("showSignupTab")
-      ?.addEventListener("click", () => {
-        openAuth("signup");
-      });
-
-    $("authSubmitBtn")
-      ?.addEventListener(
-        "click",
-        submitAuth
-      );
-
-    $("logoutBtn")
-      ?.addEventListener(
-        "click",
-        async () => {
-          await supabase.auth.signOut();
-          hide("auth");
-        }
-      );
-
-    $("submitD17Btn")
-      ?.addEventListener(
-        "click",
-        submitD17
-      );
-
-    $("confirmOrderBtn")
-      ?.addEventListener(
-        "click",
-        submitOrder
-      );
-
-    $("refreshAdminBtn")
-      ?.addEventListener(
-        "click",
-        loadAdmin
-      );
-
-    $("copyD17Btn")
-      ?.addEventListener(
-        "click",
-        async () => {
-          try {
-            await navigator.clipboard.writeText(
-              D17_NUMBER
-            );
-
-            notice(
-              "d17Notice",
-              "تم نسخ رقم D17.",
-              true
-            );
-          } catch {
-            alert(
-              "رقم D17: " +
-              D17_NUMBER
-            );
-          }
-        }
-      );
-
-    $("closeAuthBtn")
-      ?.addEventListener(
-        "click",
-        () => hide("auth")
-      );
-
-    $("closeWalletBtn")
-      ?.addEventListener(
-        "click",
-        () => hide("wallet")
-      );
-
-    $("closeD17Btn")
-      ?.addEventListener(
-        "click",
-        () => hide("d17Modal")
-      );
-
-    $("closeOrderBtn")
-      ?.addEventListener(
-        "click",
-        () => hide("orderModal")
-      );
-
-    document
-      .querySelectorAll(".modal")
-      .forEach((modal) => {
-        modal.addEventListener(
-          "click",
-          (event) => {
-            if (
-              event.target === modal
-            ) {
-              modal.classList.add(
-                "hidden"
-              );
-            }
-          }
-        );
-      });
-
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") {
-          document
-            .querySelectorAll(".modal")
-            .forEach((modal) => {
-              modal.classList.add(
-                "hidden"
-              );
-            });
-        }
-      }
-    );
+  async function submitD17Request(){
+    if(!session) return showNotice("d17Notice","سجّل الدخول أولاً.","warn");
+    if(!supabase) return showNotice("d17Notice","الاتصال بـSupabase غير جاهز.","error");
+    const reference=$("d17Reference")?.value.trim();
+    const packText=$("d17Pack")?.textContent||"";
+    const pack=packs.find(p=>packText.includes(moneyCoins(p.coins)));
+    if(!reference) return showNotice("d17Notice","اكتب رقم أو مرجع عملية D17.","warn");
+    if(!pack) return showNotice("d17Notice","تعذر تحديد الباقة.","error");
+    const {error}=await supabase.from("payment_requests").insert({user_id:session.user.id,username:profile?.username||session.user.email,pack_coins:pack.coins,amount_tnd:Number(pack.price.replace(" د.ت","")),reference,status:"pending"});
+    if(error) return showNotice("d17Notice",error.message,"error");
+    showNotice("d17Notice","✅ تبعث طلب التحقق. بعد ما تتأكد الإدارة من التحويل، تتضاف الـCoins للحساب.","ok");
   }
 
-  async function init() {
+  function openOrder(id){
+    if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}
+    selectedOffer=offers.find(o=>o.id===id); if(!selectedOffer) return;
+    if($("orderTitle")) $("orderTitle").textContent=selectedOffer.name;
+    if($("orderDesc")) $("orderDesc").textContent=selectedOffer.desc;
+    if($("orderCoins")) $("orderCoins").textContent=`${moneyCoins(selectedOffer.coins)} Coins`;
+    if($("contentUrl")) $("contentUrl").value="";
+    if($("notes")) $("notes").value="";
+    hideNotice("orderNotice"); $("orderModal")?.classList.remove("hidden");
+  }
+
+  async function confirmOrder(){
+    if(!selectedOffer||!session) return;
+    if(!supabase) return showNotice("orderNotice","الاتصال بـSupabase غير جاهز.","error");
+    const url=$("contentUrl")?.value.trim()||"";
+    const notes=$("notes")?.value.trim()||"";
+    if(!url) return showNotice("orderNotice","حط رابط المحتوى.","warn");
+    if(!/^https?:\/\//i.test(url)) return showNotice("orderNotice","الرابط لازم يبدأ بـ https:// أو http://","warn");
+    const {data,error}=await supabase.rpc("place_order",{p_offer_id:selectedOffer.id,p_offer_name:selectedOffer.name,p_platform:selectedOffer.platform,p_coins:selectedOffer.coins,p_url:url,p_notes:notes});
+    if(error) return showNotice("orderNotice",error.message,"error");
+    if(data?.new_balance!==undefined) profile.coins=data.new_balance;
+    renderProfile(); await refreshOrders(); closeModal("orderModal");
+    showNotice("offerNotice",`✅ تسجّل الطلب وتم خصم ${moneyCoins(selectedOffer.coins)} Coins. الرصيد الجديد: ${moneyCoins(profile?.coins)} Coins.` ,"ok");
+    scrollToId("orders");
+  }
+
+  function filterOffers(platform){activePlatform=platform||"all";renderOffers();scrollToId("offers");}
+
+  function bind(){
+    $("getStartedBtn")?.addEventListener("click",()=>scrollToId("services"));
+    $("exploreServicesBtn")?.addEventListener("click",()=>scrollToId("services"));
+    $("buyCoinsBtn")?.addEventListener("click",openWallet);
+    $("walletNavBtn")?.addEventListener("click",openWallet);
+    $("ordersNavBtn")?.addEventListener("click",()=>scrollToId("orders"));
+    $("adminNavBtn")?.addEventListener("click",()=>scrollToId("adminPanel"));
+    $("loginBtn")?.addEventListener("click",openAuth);
+    $("showLoginTab")?.addEventListener("click",()=>setAuthMode("login"));
+    $("showSignupTab")?.addEventListener("click",()=>setAuthMode("signup"));
+    $("authSubmitBtn")?.addEventListener("click",authSubmit);
+    $("logoutBtn")?.addEventListener("click",logout);
+    $("confirmOrderBtn")?.addEventListener("click",confirmOrder);
+    $("closeAuthBtn")?.addEventListener("click",()=>closeModal("auth"));
+    $("closeWalletBtn")?.addEventListener("click",()=>closeModal("wallet"));
+    $("closeD17Btn")?.addEventListener("click",()=>closeModal("d17Modal"));
+    $("closeOrderBtn")?.addEventListener("click",()=>closeModal("orderModal"));
+    $("submitD17Btn")?.addEventListener("click",submitD17Request);
+    $("copyD17Btn")?.addEventListener("click",copyD17);
+    $("refreshAdminBtn")?.addEventListener("click",refreshAdmin);
+    $("tiktokServiceBtn")?.addEventListener("click",()=>filterOffers("TikTok"));
+    $("instagramServiceBtn")?.addEventListener("click",()=>filterOffers("Instagram"));
+    $("youtubeServiceBtn")?.addEventListener("click",()=>filterOffers("YouTube"));
+    ["auth","wallet","d17Modal","orderModal"].forEach(id=>$(id)?.addEventListener("click",e=>{if(e.target===$(id))closeModal(id);}));
+    document.addEventListener("keydown",e=>{if(e.key==="Escape")["auth","wallet","d17Modal","orderModal"].forEach(closeModal);});
+  }
+
+  async function init(){
+    if(initialized) return;
+    initialized=true;
     renderOffers();
-    renderPacks();
-    bindEvents();
+    bind();
+    renderProfile();
 
-    if (
-      !CONFIG.SUPABASE_URL ||
-      !CONFIG.SUPABASE_KEY
-    ) {
-      console.error(
-        "POSTIK: config.js ناقص"
-      );
+    if(!window.supabase || typeof window.supabase.createClient!=="function"){
+      showAppError("⚠️ مكتبة Supabase ما تحمّلتش. تأكد من الإنترنت ثم أعد فتح الموقع.");
+      return;
+    }
+    if(!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes("YOUR-PROJECT") || !CONFIG.SUPABASE_KEY || CONFIG.SUPABASE_KEY.includes("YOUR-PUBLISHABLE")){
+      showAppError("⚠️ إعدادات Supabase ناقصة في config.js.");
       return;
     }
 
-    if (
-      !window.supabase ||
-      !window.supabase.createClient
-    ) {
-      console.error(
-        "POSTIK: Supabase لم يتم تحميله"
-      );
-      return;
+    try{
+      supabase=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
+      const {data,error}=await supabase.auth.getSession();
+      if(error) console.warn("getSession:",error.message);
+      session=data?.session||null;
+      await refreshProfile();
+      await refreshOrders();
+      if(profile?.role==="admin") await refreshAdmin();
+
+      supabase.auth.onAuthStateChange((_event,newSession)=>{
+        session=newSession;
+        setTimeout(async()=>{
+          await refreshProfile();
+          await refreshOrders();
+          if(profile?.role==="admin") await refreshAdmin();
+        },0);
+      });
+    }catch(err){
+      console.error(err);
+      showAppError("⚠️ صار خطأ في الاتصال بـSupabase. جرّب إعادة تحميل الصفحة.");
     }
-
-    supabase =
-      window.supabase.createClient(
-        CONFIG.SUPABASE_URL,
-        CONFIG.SUPABASE_KEY
-      );
-
-    const {
-      data
-    } = await supabase.auth.getSession();
-
-    currentUser =
-      data?.session?.user || null;
-
-    await loadProfile();
-
-    supabase.auth.onAuthStateChange(
-      async (
-        event,
-        sessionData
-      ) => {
-        currentUser =
-          sessionData?.user || null;
-
-        await loadProfile();
-      }
-    );
   }
 
-  if (
-    document.readyState ===
-    "loading"
-  ) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      init
-    );
-  } else {
-    init();
-  }
-
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init,{once:true});
+  else init();
 })();
