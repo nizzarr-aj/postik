@@ -1,21 +1,20 @@
-POSTIK V1
+POSTIK V2 — Services + Coins + Orders
 
-This package implements a working browser-side prototype for:
-- Services
-- Offers
-- Coins wallet
-- Order creation
-- Order history
-- TikTok / Instagram / YouTube promotion-oriented offers
+هذه نسخة Front-end تجريبية تعمل على المتصفح وتستعمل localStorage لهذا الجهاز فقط.
 
-IMPORTANT:
-This version uses localStorage, so it is a functional demo on one device only.
-It does NOT process real money and it does NOT provide artificial followers, likes,
-or views. Real multi-user Coins, payments, refunds, admin controls, and order
-execution require a backend/database and an approved payment/service integration.
+تم إصلاح:
+- Get Started
+- Explore Services
+- اختيار خدمات TikTok / Instagram / YouTube
+- فتح Wallet / Coins
+- إضافة Coins تجريبية محلياً
+- تسجيل اسم المستخدم محلياً
+- إنشاء الطلبات وخصم Coins
+- سجل الطلبات
+- أزرار وإغلاق النوافذ على الهاتف
+- إضافة version query للـCSS/JS لتفادي كاش المتصفح القديم
 
-Next production steps:
-1. Supabase (or another backend) for Auth, users, wallet ledger, offers and orders.
-2. Payment provider API/webhook for automatic payment confirmation.
-3. Admin dashboard and immutable wallet ledger.
-4. Official advertising/platform integrations only.
+مهم: الدفع الحقيقي، الحسابات متعددة المستخدمين، قاعدة البيانات، تأكيد D17، ولوحة الإدارة تحتاج Backend آمن.
+
+
+D17: الدفع الحالي يدوي. رقم D17 المعروض في واجهة الدفع: 25723544. لا يتم إضافة Coins تلقائيًا؛ يلزم Backend/Admin للتحقق من الدفع قبل الشحن في بيئة الإنتاج.

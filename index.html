@@ -1,62 +1,108 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0815">
 <title>POSTIK — Social Promotion</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <header class="nav">
-  <a class="brand" href="#">● POSTIK</a>
-  <nav><a href="#services">الخدمات</a><a href="#offers">العروض</a><a href="#orders">الطلبات</a></nav>
+  <a class="brand" href="#top">● POSTIK</a>
+  <nav>
+    <button class="nav-link" id="ordersNavBtn" type="button">الطلبات</button>
+    <button class="nav-link" id="walletNavBtn" type="button">Coins</button>
+  </nav>
   <div class="nav-actions">
     <span class="coins" id="coinBadge">0 Coins</span>
-    <button class="btn small" onclick="openAuth()">دخول</button>
+    <button class="btn small" id="loginBtn" type="button">دخول</button>
   </div>
 </header>
 
-<main>
+<main id="top">
 <section class="hero">
  <div>
   <span class="eyebrow">✦ SOCIAL PROMOTION PLATFORM</span>
   <h1>كبّر حضورك على السوشيال <b>بسهولة.</b></h1>
   <p>POSTIK يجمع الخدمات والعروض والرصيد والطلبات في لوحة واحدة، مع تنفيذ الحملات الترويجية الرسمية حسب المنصة.</p>
-  <div class="actions"><button class="btn" onclick="document.getElementById('offers').scrollIntoView({behavior:'smooth'})">شوف العروض →</button><button class="btn ghost" onclick="openWallet()">شراء Coins</button></div>
+  <div class="actions">
+    <button class="btn" id="getStartedBtn" type="button">Get Started →</button>
+    <button class="btn ghost" id="buyCoinsBtn" type="button">شراء Coins</button>
+  </div>
  </div>
  <div class="dash">
   <div class="dash-top"><b>POSTIK Dashboard</b><i>● Online</i></div>
   <div class="stats"><div><small>Coins</small><strong id="dashCoins">0</strong></div><div><small>الطلبات</small><strong id="dashOrders">0</strong></div></div>
-  <div class="mini-order"><span>⚡ حملة TikTok Promotion</span><b id="dashStatus">جاهز</b></div>
+  <div class="mini-order"><span>⚡ حملة Promotion</span><b id="dashStatus">جاهز</b></div>
  </div>
 </section>
 
 <section id="services">
- <small class="eyebrow">SERVICES</small><h2>اختار المنصة.</h2>
+ <small class="eyebrow">SERVICES</small>
+ <h2>اختار المنصة.</h2>
  <div class="grid">
-  <article class="card"><b class="icon">♪</b><h3>TikTok</h3><p>حملات ترويج رسمية للمحتوى حسب الأدوات المتاحة.</p><button class="link" onclick="filterOffers('TikTok')">شوف عروض TikTok →</button></article>
-  <article class="card"><b class="icon">◎</b><h3>Instagram</h3><p>حملات ترويج للمحتوى والحسابات عبر القنوات الرسمية.</p><button class="link" onclick="filterOffers('Instagram')">شوف عروض Instagram →</button></article>
-  <article class="card"><b class="icon">▶</b><h3>YouTube</h3><p>حملات ترويج للفيديوهات والقنوات عبر الإعلانات الرسمية.</p><button class="link" onclick="filterOffers('YouTube')">شوف عروض YouTube →</button></article>
+  <article class="card"><b class="icon">♪</b><h3>TikTok</h3><p>حملات ترويج رسمية للمحتوى حسب الأدوات المتاحة.</p><button class="link" id="tiktokServiceBtn" type="button">شوف عروض TikTok →</button></article>
+  <article class="card"><b class="icon">◎</b><h3>Instagram</h3><p>حملات ترويج للمحتوى والحسابات عبر القنوات الرسمية.</p><button class="link" id="instagramServiceBtn" type="button">شوف عروض Instagram →</button></article>
+  <article class="card"><b class="icon">▶</b><h3>YouTube</h3><p>حملات ترويج للفيديوهات والقنوات عبر الإعلانات الرسمية.</p><button class="link" id="youtubeServiceBtn" type="button">شوف عروض YouTube →</button></article>
  </div>
 </section>
 
 <section id="offers">
- <div class="section-head"><div><small class="eyebrow">OFFERS</small><h2>العروض والـCoins.</h2></div><button class="btn ghost small" onclick="openWallet()">💰 شحن الرصيد</button></div>
+ <div class="section-head">
+  <div><small class="eyebrow">OFFERS</small><h2>العروض والـCoins.</h2></div>
+  <button class="btn ghost small" id="exploreServicesBtn" type="button">Explore Services</button>
+ </div>
  <div id="offerGrid" class="grid offers"></div>
  <div id="offerNotice" class="notice hidden"></div>
 </section>
 
 <section id="orders">
- <small class="eyebrow">MY ORDERS</small><h2>طلباتي.</h2>
+ <small class="eyebrow">MY ORDERS</small>
+ <h2>طلباتي.</h2>
  <div id="ordersList" class="orders-list"></div>
 </section>
 </main>
 
-<div id="auth" class="modal hidden"><div class="modal-card"><button class="x" onclick="closeModal('auth')">×</button><h3>الحساب</h3><p class="muted">في النسخة الحالية، الحساب محلي على هذا الجهاز. الربط بقاعدة بيانات حقيقية يكون في مرحلة الـBackend.</p><label>اسم المستخدم<input id="username" placeholder="مثال: postik_user"></label><button class="btn full" onclick="saveUser()">متابعة</button></div></div>
+<div id="auth" class="modal hidden"><div class="modal-card">
+ <button class="x" id="closeAuthBtn" type="button">×</button>
+ <h3>الحساب</h3><p class="muted">في النسخة الحالية، الحساب محلي على هذا الجهاز. الربط بقاعدة بيانات حقيقية يكون في مرحلة الـBackend.</p>
+ <label>اسم المستخدم<input id="username" placeholder="مثال: postik_user"></label>
+ <button class="btn full" id="saveUserBtn" type="button">متابعة</button>
+ <div id="authNotice" class="notice hidden"></div>
+</div></div>
 
-<div id="wallet" class="modal hidden"><div class="modal-card"><button class="x" onclick="closeModal('wallet')">×</button><h3>شراء Coins</h3><p class="muted">هذه باقات تجريبية للواجهة. لا تعتبر عملية دفع حقيقية قبل ربط مزود الدفع.</p><div id="coinPacks" class="coin-packs"></div><div id="walletNotice" class="notice hidden"></div></div></div>
+<div id="wallet" class="modal hidden"><div class="modal-card">
+ <button class="x" id="closeWalletBtn" type="button">×</button>
+ <h3>شراء Coins</h3><p class="muted">الدفع عبر D17 حاليًا يدوي: تختار الباقة، تبعث المبلغ، ثم نراجع العملية قبل إضافة الـCoins.</p>
+ <div id="coinPacks" class="coin-packs"></div>
+ <div id="walletNotice" class="notice hidden"></div>
+</div></div>
 
-<div id="orderModal" class="modal hidden"><div class="modal-card"><button class="x" onclick="closeModal('orderModal')">×</button><h3 id="orderTitle">طلب عرض</h3><p id="orderDesc" class="muted"></p><div class="price-line"><span>السعر</span><strong id="orderCoins">0 Coins</strong></div><label>رابط المحتوى<input id="contentUrl" type="url" placeholder="https://..."></label><label>ملاحظات (اختياري)<textarea id="notes" rows="3" placeholder="تفاصيل الحملة"></textarea></label><button class="btn full" onclick="confirmOrder()">تأكيد الطلب</button><div id="orderNotice" class="notice hidden"></div></div></div>
+<div id="d17Modal" class="modal hidden"><div class="modal-card">
+ <button class="x" id="closeD17Btn" type="button">×</button>
+ <h3>الدفع عبر D17</h3>
+ <p class="muted">حوّل المبلغ إلى رقم D17 التالي، ثم ابعث رقم العملية/المرجع حتى يتم التحقق من الدفع.</p>
+ <div class="price-line"><span>رقم D17</span><strong id="d17Number">25723544</strong></div>
+ <div class="price-line" style="margin-top:10px"><span>الباقة</span><strong id="d17Pack">-</strong></div>
+ <button class="btn ghost full" id="copyD17Btn" type="button">نسخ رقم D17</button>
+ <label>اسم المستخدم<input id="d17User" placeholder="اسم حسابك في POSTIK"></label>
+ <label>رقم/مرجع العملية<input id="d17Reference" placeholder="مثال: رقم العملية الظاهر في D17"></label>
+ <button class="btn full" id="submitD17Btn" type="button">إرسال طلب التحقق</button>
+ <div id="d17Notice" class="notice hidden"></div>
+</div></div>
+
+<div id="orderModal" class="modal hidden"><div class="modal-card">
+ <button class="x" id="closeOrderBtn" type="button">×</button>
+ <h3 id="orderTitle">طلب عرض</h3><p id="orderDesc" class="muted"></p>
+ <div class="price-line"><span>السعر</span><strong id="orderCoins">0 Coins</strong></div>
+ <label>رابط المحتوى<input id="contentUrl" type="url" placeholder="https://..."></label>
+ <label>ملاحظات (اختياري)<textarea id="notes" rows="3" placeholder="تفاصيل الحملة"></textarea></label>
+ <button class="btn full" id="confirmOrderBtn" type="button">تأكيد الطلب</button>
+ <div id="orderNotice" class="notice hidden"></div>
+</div></div>
 
 <footer><b>POSTIK</b><span>Social Promotion Platform</span><span>© 2026 POSTIK</span></footer>
-<script src="app.js"></script>
-</body></html>
+<script src="app.js?v=3" defer></script>
+</body>
+</html>
