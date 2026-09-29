@@ -1,4 +1,4 @@
-POSTIK V7.1 FINAL
+POSTIK V7.2 FINAL FINAL
 
 Website files to upload to GitHub Pages:
 - index.html
@@ -8,7 +8,7 @@ Website files to upload to GitHub Pages:
 
 Supabase:
 - Run supabase_v7_final.sql in Supabase SQL Editor.
-- It preserves existing profiles, Coins, payments and orders and adds the V7.1 payment notification trigger.
+- It preserves existing profiles, Coins, payments and orders and adds the V7.2 FINAL payment notification trigger.
 - supabase_test_patch.sql is optional admin/test tooling and does not need to be rerun if it was already applied.
 
 D17: 25723544
