@@ -1,24 +1,21 @@
-POSTIK V6 — COMPLETE READY PACKAGE
+POSTIK V7 PRO
 
-Files:
-- index.html
-- style.css
-- app.js
-- config.js
-- supabase_test_patch.sql
+نسخة احترافية محسّنة من POSTIK.
 
-The frontend is connected to the existing Supabase project and D17 number.
-D17 verification is manual: the admin checks the real transfer before approving.
+المزايا:
+- Supabase Auth والحسابات
+- Coins ورصيد المستخدم
+- D17 manual verification
+- تاريخ الدفع وحالة كل عملية
+- إشعارات قبول/رفض الدفع داخل الموقع
+- لوحة Admin بإحصائيات
+- إنشاء طلب دفع تجريبي للإدارة بدون فلوس
+- إدارة حالات الطلب: pending / processing / completed / rejected
+- حماية عمليات الإدارة عبر is_admin()
+- تصميم Mobile-first وتحسينات للواجهة
 
-NO-REAL-MONEY TEST:
-1. Run supabase_test_patch.sql once in Supabase SQL Editor.
-2. Make sure nizarlartisto@gmail.com exists in Auth; the patch gives its profile the admin role.
-3. Log into POSTIK with that admin account.
-4. The admin panel can create a test payment for a user.
-5. Approve the test payment to verify that Coins are added without a real D17 transfer.
+الرفع:
+ارفع index.html وapp.js وstyle.css وconfig.js إلى جذر GitHub Pages.
+لا ترفع supabase_test_patch.sql كملف موقع؛ شغّله مرة واحدة في Supabase SQL Editor.
 
-IMPORTANT:
-- Never put a Supabase secret/service_role key in config.js.
-- The publishable key is intended for browser use with RLS enabled.
-- Test payments are admin-only and are for testing the workflow without real money.
-- Before public launch, keep real D17 verification manual and remove/disable the test-payment RPC if you no longer need it.
+مهم: D17 في هذه النسخة يدوي. لا توجد مصادقة D17 آلية؛ الإدارة هي التي تتحقق من التحويل الحقيقي.

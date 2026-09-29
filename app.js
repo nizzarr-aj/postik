@@ -55,6 +55,11 @@
   function closeModal(id){ $(id)?.classList.add("hidden"); }
   function scrollToId(id){ $(id)?.scrollIntoView({behavior:"smooth",block:"start"}); }
 
+  const statusText = s => ({pending:"معلّق",approved:"تمت الموافقة",rejected:"مرفوض",processing:"قيد التنفيذ",completed:"مكتمل"}[s] || s || "-" );
+  const statusClass = s => String(s||"").toLowerCase().replace(/[^a-z]/g,"");
+  const formatDate = v => { try{return new Date(v).toLocaleString("ar-TN",{dateStyle:"medium",timeStyle:"short"});}catch(e){return v||"";} };
+  function setStatus(el,status){ if(!el) return; el.className=`status ${statusClass(status)}`; el.textContent=statusText(status); }
+
   function renderOffers(){
     const grid=$("offerGrid");
     if(!grid) return;
@@ -101,42 +106,63 @@
     if(!session){
       list.innerHTML='<div class="empty">سجّل الدخول باش تشوف طلباتك.</div>';
       if($("dashOrders")) $("dashOrders").textContent="0";
+      if($("paymentsList")) $("paymentsList").innerHTML='<div class="empty">سجّل الدخول باش تشوف حركة الدفع.</div>';
       return;
     }
     if(!supabase) return;
-    const {data,error}=await supabase.from("orders").select("id,offer_name,platform,coins,url,notes,status,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false});
-    if(error){ list.innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; return; }
-    const rows=data||[];
-    if($("dashOrders")) $("dashOrders").textContent=rows.length;
-    if(!rows.length){ list.innerHTML='<div class="empty">ما عندك حتى طلب توّا.</div>'; return; }
-    list.innerHTML=rows.map(o=>`
-      <div class="order-row">
-        <div><b>#${escapeHtml(String(o.id).slice(0,8))}</b><div class="muted">${escapeHtml(o.offer_name)} — ${escapeHtml(o.platform)}</div><small>${escapeHtml(o.url)}</small>${o.notes?`<div class="muted">${escapeHtml(o.notes)}</div>`:""}</div>
-        <div><span class="status">${escapeHtml(o.status)}</span><div class="muted">${moneyCoins(o.coins)} Coins</div></div>
-      </div>`).join("");
+    const [ordersRes,paymentsRes]=await Promise.all([
+      supabase.from("orders").select("id,offer_name,platform,coins,url,notes,status,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
+      supabase.from("payment_requests").select("id,pack_coins,amount_tnd,reference,status,created_at,approved_at").eq("user_id",session.user.id).order("created_at",{ascending:false}).limit(30)
+    ]);
+    if(ordersRes.error){ list.innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; }
+    else {
+      const rows=ordersRes.data||[];
+      if($("dashOrders")) $("dashOrders").textContent=rows.length;
+      if(!rows.length) list.innerHTML='<div class="empty">ما عندك حتى طلب توّا.</div>';
+      else list.innerHTML=rows.map(o=>`
+        <div class="order-row">
+          <div class="order-main"><b>#${escapeHtml(String(o.id).slice(0,8))}</b><div class="muted">${escapeHtml(o.offer_name)} — ${escapeHtml(o.platform)}</div><small>${escapeHtml(o.url)}</small>${o.notes?`<div class="muted">${escapeHtml(o.notes)}</div>`:""}<small>${formatDate(o.created_at)}</small></div>
+          <div><span class="status ${statusClass(o.status)}">${statusText(o.status)}</span><div class="muted">${moneyCoins(o.coins)} Coins</div></div>
+        </div>`).join("");
+    }
+    if($("paymentsList")){
+      if(paymentsRes.error){ $("paymentsList").innerHTML='<div class="empty">تعذر تحميل حركة الدفع.</div>'; }
+      else {
+        const payments=paymentsRes.data||[];
+        if(!payments.length) $("paymentsList").innerHTML='<div class="empty">ما فماش عمليات دفع.</div>';
+        else {
+          const latest=payments[0];
+          if(latest.status==="approved") showNotice("userNotice",`✅ تم قبول آخر عملية: +${moneyCoins(latest.pack_coins)} Coins. الرصيد الحالي ${moneyCoins(profile?.coins)} Coins.` ,"ok");
+          else if(latest.status==="rejected") showNotice("userNotice","⚠️ آخر طلب دفع تم رفضه. راجع المرجع أو تواصل مع الإدارة.","error");
+          $("paymentsList").innerHTML=payments.map(p=>`<div class="order-row history-row"><div><b>${moneyCoins(p.pack_coins)} Coins — ${escapeHtml(p.amount_tnd)} د.ت</b><div class="history-meta">مرجع: ${escapeHtml(p.reference)} · ${formatDate(p.created_at)}</div></div><span class="status ${statusClass(p.status)}">${statusText(p.status)}</span></div>`).join("");
+        }
+      }
+    }
   }
 
   async function refreshAdmin(){
     if(profile?.role!=="admin" || !supabase) return;
     const [p,o]=await Promise.all([
-      supabase.from("payment_requests").select("id,user_id,username,pack_coins,amount_tnd,reference,status,created_at").order("created_at",{ascending:false}),
-      supabase.from("orders").select("id,user_id,username,offer_name,platform,coins,url,status,created_at").order("created_at",{ascending:false}).limit(50)
+      supabase.from("payment_requests").select("id,user_id,username,pack_coins,amount_tnd,reference,status,created_at,approved_at").order("created_at",{ascending:false}),
+      supabase.from("orders").select("id,user_id,username,offer_name,platform,coins,url,status,created_at").order("created_at",{ascending:false}).limit(100)
     ]);
     if(p.error){ showNotice("adminNotice","تعذر تحميل طلبات الدفع: "+p.error.message,"error"); return; }
     const payments=p.data||[];
+    const orders=o.data||[];
+    if($("statPayments")) $("statPayments").textContent=payments.length;
+    if($("statPending")) $("statPending").textContent=payments.filter(x=>x.status==="pending").length;
+    if($("statOrders")) $("statOrders").textContent=orders.length;
+    if($("statProcessing")) $("statProcessing").textContent=orders.filter(x=>x.status==="processing").length;
     if($("adminPayments")){
       $("adminPayments").innerHTML=payments.length?payments.map(x=>`
-        <div class="order-row">
-          <div><b>💳 ${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${moneyCoins(x.pack_coins)} Coins / ${escapeHtml(x.amount_tnd)} د.ت</div><div class="muted">مرجع: ${escapeHtml(x.reference)}</div></div>
-          <div><span class="status">${escapeHtml(x.status)}</span>${x.status==="pending"?`<button class="btn small approve-payment" data-id="${escapeHtml(x.id)}" type="button">تأكيد الدفع</button> <button class="btn small reject-payment" data-id="${escapeHtml(x.id)}" type="button">رفض</button>`:""}</div>
-        </div>`).join(""):'<div class="empty">ما فماش طلبات دفع.</div>';
+        <div class="order-row"><div class="order-main"><b>💳 ${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${moneyCoins(x.pack_coins)} Coins / ${escapeHtml(x.amount_tnd)} د.ت</div><div class="muted">مرجع: ${escapeHtml(x.reference)} · ${formatDate(x.created_at)}</div></div><div><span class="status ${statusClass(x.status)}">${statusText(x.status)}</span>${x.status==="pending"?`<div class="order-actions"><button class="btn small approve-payment" data-id="${escapeHtml(x.id)}" type="button">تأكيد الدفع</button><button class="btn small danger reject-payment" data-id="${escapeHtml(x.id)}" type="button">رفض</button></div>`:""}</div></div>`).join(""):'<div class="empty">ما فماش طلبات دفع.</div>';
       $("adminPayments").querySelectorAll(".approve-payment").forEach(b=>b.onclick=()=>approvePayment(b.dataset.id));
       $("adminPayments").querySelectorAll(".reject-payment").forEach(b=>b.onclick=()=>rejectPayment(b.dataset.id));
     }
     if(o.error){ if($("adminOrders")) $("adminOrders").innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; return; }
-    const orders=o.data||[];
     if($("adminOrders")) $("adminOrders").innerHTML=orders.length?orders.map(x=>`
-      <div class="order-row"><div><b>#${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${escapeHtml(x.offer_name)}</div></div><span class="status">${escapeHtml(x.status)}</span></div>`).join(""):'<div class="empty">ما فماش طلبات.</div>';
+      <div class="order-row"><div class="order-main"><b>#${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${escapeHtml(x.offer_name)} — ${moneyCoins(x.coins)} Coins</div><small>${escapeHtml(x.url)}</small><small>${formatDate(x.created_at)}</small></div><div><span class="status ${statusClass(x.status)}">${statusText(x.status)}</span><div class="order-actions">${["pending","processing","completed","rejected"].map(s=>`<button class="btn small ${s==="rejected"?"danger":"ghost"} order-status-btn" data-id="${escapeHtml(x.id)}" data-status="${s}" type="button">${statusText(s)}</button>`).join("")}</div></div></div>`).join(""):'<div class="empty">ما فماش طلبات.</div>';
+    $("adminOrders")?.querySelectorAll(".order-status-btn").forEach(b=>b.onclick=()=>updateOrderStatus(b.dataset.id,b.dataset.status));
   }
 
   async function approvePayment(id){
@@ -152,6 +178,14 @@
     const {error}=await supabase.rpc("reject_payment",{p_payment_id:id});
     if(error){showNotice("adminNotice",error.message,"error");return;}
     showNotice("adminNotice","تم رفض طلب الدفع.","ok");
+    await refreshAdmin();
+  }
+
+  async function updateOrderStatus(id,status){
+    if(!supabase || profile?.role!=="admin") return;
+    const {error}=await supabase.rpc("admin_update_order_status",{p_order_id:id,p_status:status});
+    if(error){showNotice("adminNotice","تعذر تحديث حالة الطلب: "+error.message,"error");return;}
+    showNotice("adminNotice",`✅ تم تغيير حالة الطلب إلى ${statusText(status)}.`,"ok");
     await refreshAdmin();
   }
 
@@ -284,6 +318,7 @@
     click("buyCoinsBtn",openWallet);
     click("walletNavBtn",openWallet);
     click("ordersNavBtn",()=>scrollToId("orders"));
+    click("refreshOrdersBtn",async()=>{await refreshProfile();await refreshOrders();});
     click("adminNavBtn",()=>scrollToId("adminPanel"));
     click("loginBtn",openAuth);
     click("showLoginTab",()=>setAuthMode("login"));
