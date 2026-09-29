@@ -75,7 +75,7 @@
     const coins=Number(profile?.coins||0);
     if($("coinBadge")) $("coinBadge").textContent=`${moneyCoins(coins)} Coins`;
     if($("dashCoins")) $("dashCoins").textContent=moneyCoins(coins);
-    if($("loginBtn")) $("loginBtn").textContent=session ? (profile?.username || "حسابي") : "دخول";
+    if($("loginBtn")) $("loginBtn").textContent=session ? (profile?.username || "حسابي ✓") : "دخول";
     document.querySelectorAll(".admin-only").forEach(e=>e.classList.toggle("hidden",profile?.role!=="admin"));
     if($("dashStatus")) $("dashStatus").textContent=session ? "متصل" : "جاهز";
   }
@@ -90,7 +90,7 @@
     if(!session){ profile=null; renderProfile(); return; }
     if(!supabase) return;
     const {data,error}=await supabase.from("profiles").select("id,username,coins,role").eq("id",session.user.id).maybeSingle();
-    if(error){ console.error(error); showNotice("authNotice","تعذر تحميل الحساب: "+error.message,"error"); return; }
+    if(error){ console.error(error); renderProfile(); showNotice("authNotice","تعذر تحميل الحساب: "+error.message,"error"); return; }
     profile=data;
     renderProfile();
   }
@@ -157,6 +157,7 @@
 
   function openAuth(){
     const modal=$("auth"); if(!modal) return;
+    renderProfile();
     modal.classList.remove("hidden");
     if($("authEmail")) $("authEmail").value="";
     if($("authPassword")) $("authPassword").value="";
@@ -191,7 +192,7 @@
     }
     const {data,error}=await supabase.auth.signInWithPassword({email,password});
     if(error) return showNotice("authNotice",error.message,"error");
-    session=data.session; await refreshProfile(); await refreshOrders(); closeModal("auth");
+    session=data.session; renderProfile(); await refreshProfile(); await refreshOrders(); closeModal("auth");
   }
 
   async function logout(){

@@ -1,18 +1,15 @@
-POSTIK V6 — READY
+POSTIK V6 — FIXED READY
 
-Replace the existing POSTIK files with these 5 files:
-- index.html
-- style.css
-- app.js
-- config.js
-- README.txt
+Replace all old project files with:
+index.html
+style.css
+app.js
+config.js
+README.txt
 
-Supabase Project URL:
-https://trfjtzthidqwczfvusze.supabase.co
+Supabase: https://trfjtzthidqwczfvusze.supabase.co
+D17: 25723544
+Cache version: v12
 
-D17 number: 25723544
-
-config.js uses the Supabase publishable key only. Never use a secret/service_role key in GitHub Pages.
-D17 verification is manual: the admin verifies the transfer and approves it.
-
-Cache version: v11
+Use only the Supabase publishable key in config.js. Never use a secret/service_role key.
+D17 verification is manual by the admin.
