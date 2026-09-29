@@ -11,6 +11,7 @@
   let activePlatform = "all";
   let authMode = "login";
   let initialized = false;
+  let notificationsCache = [];
 
   const offers = [
     {id:"tt-promo-1",platform:"TikTok",name:"TikTok Promotion Starter",desc:"حملة ترويج للمحتوى عبر القنوات الرسمية المتاحة.",coins:500,label:"حزمة بداية"},
@@ -158,6 +159,40 @@
     await refreshAdmin();
   }
 
+  function renderNotifications(){
+    const list=$("notificationsList"), badge=$("notificationBadge");
+    if(!list) return;
+    if(!session){ list.innerHTML='<div class="empty">سجّل الدخول باش تشوف الإشعارات.</div>'; badge?.classList.add("hidden"); return; }
+    const unread=notificationsCache.filter(n=>!n.read_at).length;
+    if(badge){ badge.textContent=String(unread); badge.classList.toggle("hidden",unread===0); }
+    list.innerHTML=notificationsCache.length?notificationsCache.map(n=>`
+      <button class="notification-row ${n.read_at?'read':''}" data-id="${escapeHtml(n.id)}" type="button">
+        <div><b>${escapeHtml(n.title)}</b><div class="muted">${escapeHtml(n.message)}</div></div>
+        <small class="muted">${escapeHtml(new Date(n.created_at).toLocaleString('ar-TN'))}</small>
+      </button>`).join(""):'<div class="empty">ما فماش إشعارات جديدة.</div>';
+    list.querySelectorAll(".notification-row").forEach(b=>b.addEventListener("click",async()=>{
+      const n=notificationsCache.find(x=>x.id===b.dataset.id);
+      if(n&&!n.read_at){ await supabase.rpc("mark_notification_read",{p_id:n.id}); n.read_at=new Date().toISOString(); renderNotifications(); }
+    }));
+  }
+
+  async function refreshNotifications(){
+    if(!session||!supabase){notificationsCache=[];renderNotifications();return;}
+    const {data,error}=await supabase.rpc("get_my_notifications");
+    if(error){ console.warn("notifications:",error.message); return; }
+    notificationsCache=data||[]; renderNotifications();
+  }
+
+  async function refreshPaymentHistory(){
+    const list=$("paymentsHistory"); if(!list) return;
+    if(!session){list.innerHTML='<div class="empty">سجّل الدخول باش تشوف عمليات الشحن.</div>';return;}
+    const {data,error}=await supabase.from("payment_requests").select("id,pack_coins,amount_tnd,reference,status,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}).limit(30);
+    if(error){list.innerHTML='<div class="empty">تعذر تحميل سجل الشحن.</div>';return;}
+    list.innerHTML=(data||[]).length?(data||[]).map(x=>`<div class="history-row"><div><b>${moneyCoins(x.pack_coins)} Coins</b><div class="muted">${escapeHtml(x.amount_tnd)} د.ت — ${escapeHtml(x.reference)}</div></div><span class="status ${escapeHtml(x.status)}">${escapeHtml(x.status)}</span></div>`).join(""):'<div class="empty">ما فماش عمليات شحن.</div>';
+  }
+
+  async function refreshHistory(){ await Promise.all([refreshNotifications(),refreshPaymentHistory()]); }
+
   function openAuth(){
     const modal=$("auth"); if(!modal) return;
     renderProfile();
@@ -190,7 +225,7 @@
       const {data,error}=await supabase.auth.signUp({email,password,options:{data:{username}}});
       if(error) return showNotice("authNotice",error.message,"error");
       showNotice("authNotice",data.session?"✅ الحساب تخلق وتعمل دخول.":"✅ الحساب تخلق. إذا طلب التأكيد، أكّد البريد ثم ادخل.","ok");
-      if(data.session){session=data.session;await refreshProfile();await refreshOrders();closeModal("auth");}
+      if(data.session){session=data.session;await refreshProfile();await refreshOrders();await refreshHistory();closeModal("auth");}
       return;
     }
     const {data,error}=await supabase.auth.signInWithPassword({email,password});
@@ -200,7 +235,7 @@
 
   async function logout(){
     if(supabase) await supabase.auth.signOut();
-    session=null; profile=null; renderProfile(); await refreshOrders(); closeModal("auth");
+    session=null; profile=null; notificationsCache=[]; renderProfile(); await refreshOrders(); await refreshHistory(); closeModal("auth");
   }
 
   function openWallet(){
@@ -285,6 +320,8 @@
     $("submitD17Btn")?.addEventListener("click",submitD17Request);
     $("copyD17Btn")?.addEventListener("click",copyD17);
     $("refreshAdminBtn")?.addEventListener("click",refreshAdmin);
+    $("notificationsBtn")?.addEventListener("click",()=>{scrollToId("history");refreshHistory();});
+    $("refreshHistoryBtn")?.addEventListener("click",refreshHistory);
     $("tiktokServiceBtn")?.addEventListener("click",()=>filterOffers("TikTok"));
     $("instagramServiceBtn")?.addEventListener("click",()=>filterOffers("Instagram"));
     $("youtubeServiceBtn")?.addEventListener("click",()=>filterOffers("YouTube"));
@@ -315,6 +352,7 @@
       session=data?.session||null;
       await refreshProfile();
       await refreshOrders();
+      await refreshHistory();
       if(profile?.role==="admin") await refreshAdmin();
 
       supabase.auth.onAuthStateChange((_event,newSession)=>{
@@ -322,6 +360,7 @@
         setTimeout(async()=>{
           await refreshProfile();
           await refreshOrders();
+          await refreshHistory();
           if(profile?.role==="admin") await refreshAdmin();
         },0);
       });

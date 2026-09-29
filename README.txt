@@ -1,16 +1,16 @@
-POSTIK V7 FINAL
+POSTIK V7.1 FINAL
 
-Files:
+Website files to upload to GitHub Pages:
 - index.html
 - style.css
 - app.js
 - config.js
-- supabase_test_patch.sql
 
-Upload the 5 files to the root of the GitHub Pages repo.
-Run supabase_test_patch.sql once in Supabase SQL Editor.
+Supabase:
+- Run supabase_v7_final.sql in Supabase SQL Editor.
+- It preserves existing profiles, Coins, payments and orders and adds the V7.1 payment notification trigger.
+- supabase_test_patch.sql is optional admin/test tooling and does not need to be rerun if it was already applied.
 
-D17 verification is manual: the admin confirms a payment before Coins are added.
-No Supabase secret/service key is included.
+D17: 25723544
 
-Existing user balances/orders are not deleted by the SQL patch.
+Important: D17 verification is manual. Coins are added only after an admin approves the payment.
