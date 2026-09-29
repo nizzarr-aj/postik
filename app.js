@@ -142,13 +142,14 @@
       $("adminOrders").querySelectorAll(".admin-status").forEach(s=>s.addEventListener("change",async()=>{
         const orderId=String(s.dataset.orderId||s.dataset.id||"").trim();
         const newStatus=String(s.value||"").trim();
-        const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const idIsUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
+        const idIsInteger=/^[0-9]+$/.test(orderId);
         if(!orderId){
           showNotice("adminNotice","⚠️ معرّف الطلب فارغ. ما تمّش إرسال أي تغيير. عاود تحديث لوحة الإدارة.","error");
           await refreshAdmin();
           return;
         }
-        if(!uuidPattern.test(orderId)){
+        if(!idIsUuid && !idIsInteger){
           showNotice("adminNotice","⚠️ معرّف الطلب غير صالح. ما تمّش تغيير الحالة.","error");
           await refreshAdmin();
           return;
