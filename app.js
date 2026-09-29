@@ -138,8 +138,32 @@
     const orders=o.data||[];
     if($("adminOrders")) {
       $("adminOrders").innerHTML=orders.length?orders.map(x=>`
-      <div class="order-row"><div><b>#${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${escapeHtml(x.offer_name)}</div></div><div><span class="status">${escapeHtml(x.status)}</span>${x.status!=="completed"&&x.status!=="rejected"?` <select class="admin-status" data-id="${escapeHtml(x.id)}"><option value="pending" ${x.status==="pending"?"selected":""}>pending</option><option value="processing" ${x.status==="processing"?"selected":""}>processing</option><option value="completed">completed</option><option value="rejected">rejected</option></select>`:""}</div></div>`).join(""):'<div class="empty">ما فماش طلبات.</div>';
-      $("adminOrders").querySelectorAll(".admin-status").forEach(s=>s.addEventListener("change",async()=>{const {error}=await supabase.rpc("admin_update_order_status",{p_order_id:s.dataset.id,p_status:s.value});if(error) showNotice("adminNotice",error.message,"error"); else {showNotice("adminNotice","✅ تم تحديث حالة الطلب.","ok");await refreshAdmin();}}));
+      <div class="order-row"><div><b>#${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${escapeHtml(x.offer_name)}</div></div><div><span class="status">${escapeHtml(x.status)}</span>${x.status!=="completed"&&x.status!=="rejected"?` <select class="admin-status" data-order-id="${escapeHtml(String(x.id||""))}" data-id="${escapeHtml(String(x.id||""))}"><option value="pending" ${x.status==="pending"?"selected":""}>pending</option><option value="processing" ${x.status==="processing"?"selected":""}>processing</option><option value="completed">completed</option><option value="rejected">rejected</option></select>`:""}</div></div>`).join(""):'<div class="empty">ما فماش طلبات.</div>';
+      $("adminOrders").querySelectorAll(".admin-status").forEach(s=>s.addEventListener("change",async()=>{
+        const orderId=String(s.dataset.orderId||s.dataset.id||"").trim();
+        const newStatus=String(s.value||"").trim();
+        const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if(!orderId){
+          showNotice("adminNotice","⚠️ معرّف الطلب فارغ. ما تمّش إرسال أي تغيير. عاود تحديث لوحة الإدارة.","error");
+          await refreshAdmin();
+          return;
+        }
+        if(!uuidPattern.test(orderId)){
+          showNotice("adminNotice","⚠️ معرّف الطلب غير صالح. ما تمّش تغيير الحالة.","error");
+          await refreshAdmin();
+          return;
+        }
+        if(!["pending","processing","completed","rejected"].includes(newStatus)){
+          showNotice("adminNotice","⚠️ حالة الطلب غير صالحة.","error");
+          await refreshAdmin();
+          return;
+        }
+        s.disabled=true;
+        const {error}=await supabase.rpc("admin_update_order_status",{p_order_id:orderId,p_status:newStatus});
+        s.disabled=false;
+        if(error) showNotice("adminNotice",error.message,"error");
+        else {showNotice("adminNotice","✅ تم تحديث حالة الطلب.","ok");await refreshAdmin();}
+      }));
     }
   }
 
