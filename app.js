@@ -68,7 +68,7 @@
         <div class="meta">${escapeHtml(o.label)}</div>
         <button class="btn offer-order-btn" data-id="${escapeHtml(o.id)}" type="button">اختار العرض</button>
       </article>`).join("");
-    grid.querySelectorAll(".offer-order-btn").forEach(b=>b.addEventListener("click",()=>openOrder(b.dataset.id)));
+    grid.querySelectorAll(".offer-order-btn").forEach(b=>b.onclick=()=>openOrder(b.dataset.id));
   }
 
   function renderProfile(){
@@ -130,8 +130,8 @@
           <div><b>💳 ${escapeHtml(String(x.id).slice(0,8))}</b><div class="muted">${escapeHtml(x.username||"")} — ${moneyCoins(x.pack_coins)} Coins / ${escapeHtml(x.amount_tnd)} د.ت</div><div class="muted">مرجع: ${escapeHtml(x.reference)}</div></div>
           <div><span class="status">${escapeHtml(x.status)}</span>${x.status==="pending"?`<button class="btn small approve-payment" data-id="${escapeHtml(x.id)}" type="button">تأكيد الدفع</button> <button class="btn small reject-payment" data-id="${escapeHtml(x.id)}" type="button">رفض</button>`:""}</div>
         </div>`).join(""):'<div class="empty">ما فماش طلبات دفع.</div>';
-      $("adminPayments").querySelectorAll(".approve-payment").forEach(b=>b.addEventListener("click",()=>approvePayment(b.dataset.id)));
-      $("adminPayments").querySelectorAll(".reject-payment").forEach(b=>b.addEventListener("click",()=>rejectPayment(b.dataset.id)));
+      $("adminPayments").querySelectorAll(".approve-payment").forEach(b=>b.onclick=()=>approvePayment(b.dataset.id));
+      $("adminPayments").querySelectorAll(".reject-payment").forEach(b=>b.onclick=()=>rejectPayment(b.dataset.id));
     }
     if(o.error){ if($("adminOrders")) $("adminOrders").innerHTML='<div class="empty">تعذر تحميل الطلبات.</div>'; return; }
     const orders=o.data||[];
@@ -152,6 +152,17 @@
     const {error}=await supabase.rpc("reject_payment",{p_payment_id:id});
     if(error){showNotice("adminNotice",error.message,"error");return;}
     showNotice("adminNotice","تم رفض طلب الدفع.","ok");
+    await refreshAdmin();
+  }
+
+  async function createTestPayment(){
+    if(profile?.role!=="admin" || !supabase) return;
+    const email=$("testUserEmail")?.value.trim();
+    const coins=Number($("testPackCoins")?.value||500);
+    if(!email) return showNotice("adminNotice","اكتب إيميل المستخدم للاختبار.","warn");
+    const {error}=await supabase.rpc("create_test_payment_by_email",{p_email:email,p_pack_coins:coins});
+    if(error){showNotice("adminNotice","فشل إنشاء الاختبار: "+error.message,"error");return;}
+    showNotice("adminNotice","✅ تخلق طلب دفع تجريبي. تلقاه تحت في طلبات D17 وتقدر تعمل عليه تأكيد الدفع.","ok");
     await refreshAdmin();
   }
 
@@ -204,7 +215,7 @@
     const packBox=$("coinPacks"); if(!packBox) return;
     packBox.innerHTML=packs.map(p=>`<div class="coin-pack"><b>${moneyCoins(p.coins)} Coins</b><span>${p.price}</span><button class="btn small topup-btn" data-coins="${p.coins}" type="button">اختار</button></div>`).join("");
     $("wallet")?.classList.remove("hidden");
-    packBox.querySelectorAll(".topup-btn").forEach(b=>b.addEventListener("click",()=>openD17Payment(Number(b.dataset.coins))));
+    packBox.querySelectorAll(".topup-btn").forEach(b=>b.onclick=()=>openD17Payment(Number(b.dataset.coins)));
   }
 
   function openD17Payment(coins){
@@ -263,30 +274,45 @@
   function filterOffers(platform){activePlatform=platform||"all";renderOffers();scrollToId("offers");}
 
   function bind(){
-    $("getStartedBtn")?.addEventListener("click",()=>scrollToId("services"));
-    $("exploreServicesBtn")?.addEventListener("click",()=>scrollToId("services"));
-    $("buyCoinsBtn")?.addEventListener("click",openWallet);
-    $("walletNavBtn")?.addEventListener("click",openWallet);
-    $("ordersNavBtn")?.addEventListener("click",()=>scrollToId("orders"));
-    $("adminNavBtn")?.addEventListener("click",()=>scrollToId("adminPanel"));
-    $("loginBtn")?.addEventListener("click",openAuth);
-    $("showLoginTab")?.addEventListener("click",()=>setAuthMode("login"));
-    $("showSignupTab")?.addEventListener("click",()=>setAuthMode("signup"));
-    $("authSubmitBtn")?.addEventListener("click",authSubmit);
-    $("logoutBtn")?.addEventListener("click",logout);
-    $("confirmOrderBtn")?.addEventListener("click",confirmOrder);
-    $("closeAuthBtn")?.addEventListener("click",()=>closeModal("auth"));
-    $("closeWalletBtn")?.addEventListener("click",()=>closeModal("wallet"));
-    $("closeD17Btn")?.addEventListener("click",()=>closeModal("d17Modal"));
-    $("closeOrderBtn")?.addEventListener("click",()=>closeModal("orderModal"));
-    $("submitD17Btn")?.addEventListener("click",submitD17Request);
-    $("copyD17Btn")?.addEventListener("click",copyD17);
-    $("refreshAdminBtn")?.addEventListener("click",refreshAdmin);
-    $("tiktokServiceBtn")?.addEventListener("click",()=>filterOffers("TikTok"));
-    $("instagramServiceBtn")?.addEventListener("click",()=>filterOffers("Instagram"));
-    $("youtubeServiceBtn")?.addEventListener("click",()=>filterOffers("YouTube"));
-    ["auth","wallet","d17Modal","orderModal"].forEach(id=>$(id)?.addEventListener("click",e=>{if(e.target===$(id))closeModal(id);}));
-    document.addEventListener("keydown",e=>{if(e.key==="Escape")["auth","wallet","d17Modal","orderModal"].forEach(closeModal);});
+    const click=(id,fn)=>{
+      const el=$(id);
+      if(el) el.onclick=fn;
+    };
+
+    click("getStartedBtn",()=>scrollToId("services"));
+    click("exploreServicesBtn",()=>scrollToId("services"));
+    click("buyCoinsBtn",openWallet);
+    click("walletNavBtn",openWallet);
+    click("ordersNavBtn",()=>scrollToId("orders"));
+    click("adminNavBtn",()=>scrollToId("adminPanel"));
+    click("loginBtn",openAuth);
+    click("showLoginTab",()=>setAuthMode("login"));
+    click("showSignupTab",()=>setAuthMode("signup"));
+    click("authSubmitBtn",authSubmit);
+    click("logoutBtn",logout);
+    click("confirmOrderBtn",confirmOrder);
+    click("closeAuthBtn",()=>closeModal("auth"));
+    click("closeWalletBtn",()=>closeModal("wallet"));
+    click("closeD17Btn",()=>closeModal("d17Modal"));
+    click("closeOrderBtn",()=>closeModal("orderModal"));
+    click("submitD17Btn",submitD17Request);
+    click("copyD17Btn",copyD17);
+    click("refreshAdminBtn",refreshAdmin);
+    click("createTestPaymentBtn",createTestPayment);
+    click("tiktokServiceBtn",()=>filterOffers("TikTok"));
+    click("instagramServiceBtn",()=>filterOffers("Instagram"));
+    click("youtubeServiceBtn",()=>filterOffers("YouTube"));
+
+    ["auth","wallet","d17Modal","orderModal"].forEach(id=>{
+      const modal=$(id);
+      if(modal) modal.onclick=e=>{
+        if(e.target===modal) closeModal(id);
+      };
+    });
+
+    document.onkeydown=e=>{
+      if(e.key==="Escape") ["auth","wallet","d17Modal","orderModal"].forEach(closeModal);
+    };
   }
 
   async function init(){
