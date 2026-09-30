@@ -1,0 +1,54 @@
+name: Unpack POSTIK Complete
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find POSTIK Complete ZIP
+        run: |
+          set -e
+
+          ZIP=$(find . -maxdepth 1 -type f -iname 'POSTIK_WEB_FIX_COMPLETE*.zip' | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "POSTIK complete ZIP not found"
+            exit 1
+          fi
+
+          rm -rf extracted
+          mkdir extracted
+          unzip -o "$ZIP" -d extracted
+
+      - name: Apply website files
+        run: |
+          set -e
+
+          cp extracted/app.js ./app.js
+          cp extracted/style.css ./style.css
+          cp extracted/index.html ./index.html
+
+          echo "config.js is intentionally preserved."
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add app.js style.css index.html
+
+          if git diff --cached --quiet; then
+            echo "No website changes to commit"
+          else
+            git commit -m "Apply POSTIK complete UI and stability update"
+            git push
+          fi
