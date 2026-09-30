@@ -19,14 +19,25 @@
   function escapeHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
   function showNotice(id,msg,type="info"){const e=$(id);if(!e)return;e.className=`notice ${type}`;e.textContent=msg;}
   function hideNotice(id){const e=$(id);if(e){e.className="notice hidden";e.textContent="";}}
-  function closeModal(id){$(id)?.classList.add("hidden");}
+  function resetHorizontalScroll(){
+    try{
+      document.documentElement.scrollLeft=0;
+      document.body.scrollLeft=0;
+      window.scrollTo(0,window.scrollY||0);
+    }catch(e){}
+  }
+  function closeModal(id){
+    $(id)?.classList.add("hidden");
+    setTimeout(()=>resetHorizontalScroll(),0);
+  }
 
-  // FIX: never use scrollIntoView in the RTL Android WebView.
+  // FIX: keep RTL Android WebView pinned to horizontal position 0.
   function scrollToId(id){
     const e=$(id); if(!e)return;
+    resetHorizontalScroll();
     const top=e.getBoundingClientRect().top+window.scrollY-10;
-    window.scrollTo({top:Math.max(0,top),left:0,behavior:"smooth"});
-    setTimeout(()=>window.scrollTo({top:Math.max(0,top),left:0,behavior:"auto"}),450);
+    window.scrollTo({top:Math.max(0,top),behavior:"smooth"});
+    setTimeout(()=>{window.scrollTo({top:Math.max(0,top),behavior:"auto"});resetHorizontalScroll();},450);
   }
 
   function renderOffers(){
@@ -95,7 +106,7 @@
   async function refreshNotifications(){if(!session||!supabase){notificationsCache=[];renderNotifications();return;}const {data,error}=await supabase.rpc("get_my_notifications");if(error){console.warn("notifications:",error.message);return;}notificationsCache=data||[];renderNotifications();}
   async function refreshPaymentHistory(){const list=$("paymentsHistory");if(!list)return;if(!session){list.innerHTML='<div class="empty">سجّل الدخول باش تشوف عمليات الشحن.</div>';return;}const {data,error}=await supabase.from("payment_requests").select("id,pack_coins,amount_tnd,reference,status,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}).limit(30);if(error){list.innerHTML='<div class="empty">تعذر تحميل سجل الشحن.</div>';return;}list.innerHTML=(data||[]).length?(data||[]).map(x=>`<div class="history-row"><div><b>${moneyCoins(x.pack_coins)} Coins</b><div class="muted">${escapeHtml(x.amount_tnd)} د.ت — ${escapeHtml(x.reference)}</div></div><span class="status ${escapeHtml(x.status)}">${escapeHtml(x.status)}</span></div>`).join(""):'<div class="empty">ما فماش عمليات شحن.</div>';}
   async function refreshHistory(){await Promise.all([refreshNotifications(),refreshPaymentHistory()]);}
-  function openAuth(){const modal=$("auth");if(!modal)return;renderProfile();modal.classList.remove("hidden");if($("authEmail"))$("authEmail").value="";if($("authPassword"))$("authPassword").value="";if($("authUsername"))$("authUsername").value=profile?.username||"";setAuthMode(session?"login":authMode);hideNotice("authNotice");}
+  function openAuth(){const modal=$("auth");if(!modal)return;renderProfile();resetHorizontalScroll();modal.classList.remove("hidden");if($("authEmail"))$("authEmail").value="";if($("authPassword"))$("authPassword").value="";if($("authUsername"))$("authUsername").value=profile?.username||"";setAuthMode(session?"login":authMode);hideNotice("authNotice");}
   function setAuthMode(mode){authMode=mode;$("showLoginTab")?.classList.toggle("active",mode==="login");$("showSignupTab")?.classList.toggle("active",mode==="signup");$("authUsernameWrap")?.classList.toggle("hidden",mode!=="signup");$("authSubmitBtn")?.classList.toggle("hidden",!!session);$("logoutBtn")?.classList.toggle("hidden",!session);if($("authSubmitBtn"))$("authSubmitBtn").textContent=mode==="signup"?"إنشاء الحساب":"دخول";}
   async function authSubmit(){
     if(!supabase)return showNotice("authNotice","الاتصال بـSupabase مازال ما تجهزش. عاود افتح الصفحة.","error");
@@ -104,8 +115,8 @@
     const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)return showNotice("authNotice",error.message,"error");session=data.session;renderProfile();await refreshProfile();await refreshOrders();closeModal("auth");
   }
   async function logout(){if(supabase)await supabase.auth.signOut();session=null;profile=null;notificationsCache=[];renderProfile();await refreshOrders();await refreshHistory();closeModal("auth");}
-  function openWallet(){const packBox=$("coinPacks");if(!packBox)return;packBox.innerHTML=packs.map(p=>`<div class="coin-pack"><b>${moneyCoins(p.coins)} Coins</b><span>${p.price}</span><button class="btn small topup-btn" data-coins="${p.coins}" type="button">اختار</button></div>`).join("");$("wallet")?.classList.remove("hidden");packBox.querySelectorAll(".topup-btn").forEach(b=>b.addEventListener("click",()=>openD17Payment(Number(b.dataset.coins))));}
-  function openD17Payment(coins){if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}const pack=packs.find(p=>p.coins===coins);if(!pack)return;if($("d17Number"))$("d17Number").textContent=D17_NUMBER;if($("d17Pack"))$("d17Pack").textContent=`${moneyCoins(pack.coins)} Coins — ${pack.price}`;if($("d17Reference"))$("d17Reference").value="";hideNotice("d17Notice");closeModal("wallet");$("d17Modal")?.classList.remove("hidden");}
+  function openWallet(){resetHorizontalScroll();const packBox=$("coinPacks");if(!packBox)return;packBox.innerHTML=packs.map(p=>`<div class="coin-pack"><b>${moneyCoins(p.coins)} Coins</b><span>${p.price}</span><button class="btn small topup-btn" data-coins="${p.coins}" type="button">اختار</button></div>`).join("");$("wallet")?.classList.remove("hidden");packBox.querySelectorAll(".topup-btn").forEach(b=>b.addEventListener("click",()=>openD17Payment(Number(b.dataset.coins))));}
+  function openD17Payment(coins){resetHorizontalScroll();if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}const pack=packs.find(p=>p.coins===coins);if(!pack)return;if($("d17Number"))$("d17Number").textContent=D17_NUMBER;if($("d17Pack"))$("d17Pack").textContent=`${moneyCoins(pack.coins)} Coins — ${pack.price}`;if($("d17Reference"))$("d17Reference").value="";hideNotice("d17Notice");closeModal("wallet");$("d17Modal")?.classList.remove("hidden");}
   async function copyD17(){try{await navigator.clipboard.writeText(D17_NUMBER);showNotice("d17Notice","✅ تم نسخ رقم D17.","ok");}catch(e){showNotice("d17Notice",`رقم D17: ${D17_NUMBER}`,"info");}}
   async function submitD17Request(){
     if(!session)return showNotice("d17Notice","سجّل الدخول أولاً.","warn");if(!supabase)return showNotice("d17Notice","الاتصال بـSupabase غير جاهز.","error");
@@ -114,13 +125,13 @@
     const {error}=await supabase.from("payment_requests").insert({user_id:session.user.id,username:profile?.username||session.user.email,pack_coins:pack.coins,amount_tnd:Number(pack.price.replace(" د.ت","")),reference,status:"pending"});
     if(error)return showNotice("d17Notice",error.message,"error");showNotice("d17Notice","✅ تبعث طلب التحقق. بعد ما تتأكد الإدارة من التحويل، تتضاف الـCoins للحساب.","ok");
   }
-  function openOrder(id){if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}selectedOffer=offers.find(o=>o.id===id);if(!selectedOffer)return;if($("orderTitle"))$("orderTitle").textContent=selectedOffer.name;if($("orderDesc"))$("orderDesc").textContent=selectedOffer.desc;if($("orderCoins"))$("orderCoins").textContent=`${moneyCoins(selectedOffer.coins)} Coins`;if($("contentUrl"))$("contentUrl").value="";if($("notes"))$("notes").value="";hideNotice("orderNotice");$("orderModal")?.classList.remove("hidden");}
+  function openOrder(id){resetHorizontalScroll();if(!session){openAuth();showNotice("authNotice","سجّل الدخول أولاً.","warn");return;}selectedOffer=offers.find(o=>o.id===id);if(!selectedOffer)return;if($("orderTitle"))$("orderTitle").textContent=selectedOffer.name;if($("orderDesc"))$("orderDesc").textContent=selectedOffer.desc;if($("orderCoins"))$("orderCoins").textContent=`${moneyCoins(selectedOffer.coins)} Coins`;if($("contentUrl"))$("contentUrl").value="";if($("notes"))$("notes").value="";hideNotice("orderNotice");$("orderModal")?.classList.remove("hidden");}
   async function confirmOrder(){
     if(!selectedOffer||!session)return;if(!supabase)return showNotice("orderNotice","الاتصال بـSupabase غير جاهز.","error");
     const url=$("contentUrl")?.value.trim()||"",notes=$("notes")?.value.trim()||"";if(!url)return showNotice("orderNotice","حط رابط المحتوى.","warn");if(!/^https?:\/\//i.test(url))return showNotice("orderNotice","الرابط لازم يبدأ بـ https:// أو http://","warn");
     const {data,error}=await supabase.rpc("place_order",{p_offer_id:selectedOffer.id,p_offer_name:selectedOffer.name,p_platform:selectedOffer.platform,p_coins:selectedOffer.coins,p_url:url,p_notes:notes});if(error)return showNotice("orderNotice",error.message,"error");if(data?.new_balance!==undefined)profile.coins=data.new_balance;renderProfile();await refreshOrders();closeModal("orderModal");showNotice("offerNotice",`✅ تسجّل الطلب وتم خصم ${moneyCoins(selectedOffer.coins)} Coins. الرصيد الجديد: ${moneyCoins(profile?.coins)} Coins.` ,"ok");scrollToId("orders");
   }
-  function filterOffers(platform){activePlatform=platform||"all";renderOffers();scrollToId("services");}
+  function filterOffers(platform){resetHorizontalScroll();activePlatform=platform||"all";renderOffers();scrollToId("services");resetHorizontalScroll();}
   function bind(){
     $("getStartedBtn")?.addEventListener("click",()=>scrollToId("services"));$("exploreServicesBtn")?.addEventListener("click",()=>scrollToId("services"));$("buyCoinsBtn")?.addEventListener("click",openWallet);$("walletNavBtn")?.addEventListener("click",openWallet);$("ordersNavBtn")?.addEventListener("click",()=>scrollToId("orders"));$("adminNavBtn")?.addEventListener("click",()=>scrollToId("adminPanel"));$("loginBtn")?.addEventListener("click",openAuth);$("showLoginTab")?.addEventListener("click",()=>setAuthMode("login"));$("showSignupTab")?.addEventListener("click",()=>setAuthMode("signup"));$("authSubmitBtn")?.addEventListener("click",authSubmit);$("logoutBtn")?.addEventListener("click",logout);$("confirmOrderBtn")?.addEventListener("click",confirmOrder);$("closeAuthBtn")?.addEventListener("click",()=>closeModal("auth"));$("closeWalletBtn")?.addEventListener("click",()=>closeModal("wallet"));$("closeD17Btn")?.addEventListener("click",()=>closeModal("d17Modal"));$("closeOrderBtn")?.addEventListener("click",()=>closeModal("orderModal"));$("submitD17Btn")?.addEventListener("click",submitD17Request);$("copyD17Btn")?.addEventListener("click",copyD17);$("refreshAdminBtn")?.addEventListener("click",refreshAdmin);$("notificationsBtn")?.addEventListener("click",()=>{scrollToId("history");refreshHistory();});$("refreshHistoryBtn")?.addEventListener("click",refreshHistory);$("tiktokServiceBtn")?.addEventListener("click",()=>filterOffers("TikTok"));$("instagramServiceBtn")?.addEventListener("click",()=>filterOffers("Instagram"));$("youtubeServiceBtn")?.addEventListener("click",()=>filterOffers("YouTube"));
     ["auth","wallet","d17Modal","orderModal"].forEach(id=>$(id)?.addEventListener("click",e=>{if(e.target===$(id))closeModal(id);}));
